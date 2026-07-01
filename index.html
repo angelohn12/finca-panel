@@ -222,6 +222,11 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
 .toast{position:fixed;bottom:22px;right:22px;background:var(--forest);color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2);transform:translateY(80px);opacity:0;transition:all .3s;z-index:999;}
 .toast.show{transform:translateY(0);opacity:1;}
 .toast.err{background:var(--red);}
+.toast.info{background:var(--sky);}
+
+/* SKELETON DE CARGA — evita que la pantalla se vea "rota" mientras llega la data */
+.skeleton-block{border-radius:var(--radius);background:linear-gradient(90deg,var(--fog) 25%,var(--mist) 37%,var(--fog) 63%);background-size:400% 100%;animation:skeleton-shimmer 1.4s ease infinite;border:1px solid var(--border);}
+@keyframes skeleton-shimmer{0%{background-position:100% 50%}100%{background-position:0% 50%}}
 
 /* COLORS PALETTE FOR PROJECTS */
 .color-pick{display:flex;gap:6px;flex-wrap:wrap;}
@@ -405,7 +410,10 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
   </div>
 
   <div class="sec">Proyectos activos</div>
-  <div id="proyectos-list"></div>
+  <div id="proyectos-list">
+    <div class="skeleton-block" style="height:64px;margin-bottom:12px"></div>
+    <div class="skeleton-block" style="height:180px"></div>
+  </div>
 </div>
 
 <!-- ══ MI VISTA ══ -->
@@ -854,7 +862,16 @@ function markSynced(id){
 }
 function isSynced(id){return getSyncedIds().has(id);}
 
-function toast(m,e){var t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' err':'');setTimeout(function(){t.classList.remove('show');},3500);}
+var toastTimer=null;
+function toast(m,e){
+  var t=document.getElementById('toast');
+  t.textContent=m;
+  // 'info' (cargando…) se ve distinto de 'err' (error) y del éxito por defecto (verde)
+  var cls=e?'err':(m.indexOf('⏳')===0?'info':'');
+  t.className='toast show'+(cls?' '+cls:'');
+  if(toastTimer)clearTimeout(toastTimer); // evita que un aviso nuevo se corte por el timer del anterior
+  toastTimer=setTimeout(function(){t.classList.remove('show');},3500);
+}
 function cerrarModal(id){document.getElementById(id).classList.remove('open');}
 
 function toggleNavMenu(){
@@ -1173,7 +1190,16 @@ function renderTx(){
   var lista=APP.tx.filter(function(t){
     return(!ft||t.tipo===ft)&&(!fc||t.cosecha===fc)&&(!fp||String(t.projId)===fp);
   });
-  if(!lista.length){document.getElementById('tx-list').innerHTML='<div style="padding:28px;text-align:center;color:var(--ink4)">Sin transacciones.</div>';return;}
+  if(!lista.length){
+    var hayFiltros=ft||fc||fp;
+    document.getElementById('tx-list').innerHTML=
+      '<div style="padding:32px;text-align:center;color:var(--ink4)">'+
+      '<div style="font-size:28px;margin-bottom:8px">'+(hayFiltros?'🔍':'📋')+'</div>'+
+      '<div style="font-size:13px;font-weight:600">'+(hayFiltros?'Sin resultados con estos filtros':'Todavía no hay movimientos')+'</div>'+
+      '<div style="font-size:11px;margin-top:4px">'+(hayFiltros?'Probá cambiar el filtro de tipo o cosecha':'Usá "+ Nuevo movimiento" arriba para registrar el primero')+'</div>'+
+      '</div>';
+    return;
+  }
   var h='';
   lista.forEach(function(t){
     var s=t.tipo==='Gasto'?'-':'+';var cm=t.tipo==='Gasto'?'mn':'mpos';
