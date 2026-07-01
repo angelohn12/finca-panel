@@ -560,8 +560,8 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;heig
   <div class="pf-hero">
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div><div class="pf-title">👤 Mis Finanzas</div><div class="pf-sub">Vista personal privada</div></div>
-      <div style="text-align:right;flex-shrink:0;margin-left:16px">
-        <div style="font-size:10px;opacity:.4;text-transform:uppercase;letter-spacing:1px">Salario bruto</div>
+      <div style="text-align:right;flex-shrink:0;margin-left:16px;cursor:pointer" onclick="abrirModalSalario()" title="Tocá para editar tu salario">
+        <div style="font-size:10px;opacity:.4;text-transform:uppercase;letter-spacing:1px">Salario bruto ✎</div>
         <div style="font-size:18px;font-weight:800;color:#a8d5ff;margin-top:2px" id="pf-salario-bruto">—</div>
       </div>
     </div>
@@ -662,6 +662,23 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;heig
     <div style="display:flex;gap:9px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="cerrarModal('modal-deuda-p')">Cancelar</button>
       <button class="btn btn-primary" onclick="guardarDeuda()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL EDITAR SALARIO ══ -->
+<div class="overlay" id="modal-salario">
+  <div class="modal" style="width:420px">
+    <div class="modal-title"><span>✎ Mi salario</span><button class="modal-close" onclick="cerrarModal('modal-salario')">✕</button></div>
+    <div style="font-size:11px;color:var(--ink4);margin-bottom:12px">Estos datos son personales: se guardan solo en este dispositivo, nunca en el código ni en el Sheet compartido.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:11px">
+      <div class="field"><label>Salario bruto ($/mes)</label><input type="number" id="mss-bruto" class="fi" min="0" step="25" placeholder="0"></div>
+      <div class="field"><label>Salario neto ($/mes)</label><input type="number" id="mss-neto" class="fi" min="0" step="25" placeholder="0"></div>
+    </div>
+    <div class="field" style="margin-bottom:14px"><label>Tipo de cambio (₡ por $)</label><input type="number" id="mss-tc" class="fi" min="1" step="1" placeholder="520"></div>
+    <div style="display:flex;gap:9px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-salario')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarSalario()">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -909,18 +926,25 @@ function guardarProyecto(){
   var total=socios.reduce(function(s,x){return s+x.pctGanancia;},0);
   if(Math.abs(total-100)>1){toast('⚠ El % de ganancia debe sumar 100%',true);return;}
 
-  if(editandoProjId){
-    var proj=APP.proyectos.find(function(p){return p.id===editandoProjId;});
-    if(proj){proj.nombre=nombre;proj.cultivo=cultivo;proj.ha=ha;proj.plantas=plantas;proj.inv=inv;proj.ciclo=ciclo;proj.siembra=siembra;proj.socios=socios;proj.color=colorSeleccionado;}
-  } else {
-    var precios=JSON.parse(JSON.stringify(PRECIOS_BASE));
-    APP.proyectos.push({id:APP.nextProjId++,nombre:nombre,cultivo:cultivo,ha:ha,plantas:plantas,inv:inv,ciclo:ciclo,siembra:siembra,socios:socios,color:colorSeleccionado,precios:precios,rend:100,mort:5,activo:true});
-  }
-  saveL();
-  cerrarModal('modal-proj');
-  renderPortafolio();
-  syncProyectosASheet();
-  toast('✅ Proyecto guardado y sincronizado');
+  // El guardado reescribe la lista COMPLETA de proyectos en el Sheet, así que
+  // primero se trae lo último (por si el otro socio creó/editó un proyecto
+  // desde su dispositivo) y recién entonces se aplica el cambio sobre esa
+  // lista fresca. Sin esto, una copia desactualizada pisaría lo del otro.
+  toast('⏳ Guardando proyecto…');
+  cargarDesdeSheets(function(){
+    if(editandoProjId){
+      var proj=APP.proyectos.find(function(p){return p.id===editandoProjId;});
+      if(proj){proj.nombre=nombre;proj.cultivo=cultivo;proj.ha=ha;proj.plantas=plantas;proj.inv=inv;proj.ciclo=ciclo;proj.siembra=siembra;proj.socios=socios;proj.color=colorSeleccionado;}
+      else{toast('⚠ Ese proyecto ya no existe en Sheets (¿lo borró el otro usuario?)',true);cerrarModal('modal-proj');renderPortafolio();return;}
+    } else {
+      var precios=JSON.parse(JSON.stringify(PRECIOS_BASE));
+      APP.proyectos.push({id:APP.nextProjId++,nombre:nombre,cultivo:cultivo,ha:ha,plantas:plantas,inv:inv,ciclo:ciclo,siembra:siembra,socios:socios,color:colorSeleccionado,precios:precios,rend:100,mort:5,activo:true});
+    }
+    saveL();
+    cerrarModal('modal-proj');
+    renderPortafolio();
+    syncProyectosASheet();
+  });
 }
 
 // ── RENDER PORTAFOLIO ──
@@ -1152,8 +1176,10 @@ function renderKPIs(){
   var tg=g.reduce(function(s,t){return s+parseFloat(t.monto);},0);
   var ta=a.reduce(function(s,t){return s+parseFloat(t.monto);},0);
   var ti=i.reduce(function(s,t){return s+parseFloat(t.monto);},0);
-  var inv=fp?((APP.proyectos.find(function(p){return String(p.id)===fp;})||{}).inv||20650):20650;
-  var e=Math.round((tg/inv)*100);
+  // Inversión de referencia: la del proyecto filtrado, o la suma de todos.
+  var inv=fp?((APP.proyectos.find(function(p){return String(p.id)===fp;})||{}).inv||0)
+            :APP.proyectos.reduce(function(s,p){return s+(p.inv||0);},0);
+  var e=inv>0?Math.round((tg/inv)*100):0;
   document.getElementById('m-g').textContent='$'+tg.toLocaleString('es-CR',{minimumFractionDigits:0});
   document.getElementById('m-gn').textContent=g.length+' transacciones';
   document.getElementById('m-a').textContent='$'+ta.toLocaleString('es-CR',{minimumFractionDigits:0});
@@ -1221,6 +1247,10 @@ function guardar(){
 
 // ── MI VISTA ──
 function renderMiVista(){
+  initPersonal();
+  var sbMV=APP.personal.salarioBruto||0;
+  var elMV=document.getElementById('mv-salario');
+  if(elMV)elMV.textContent=sbMV>0?'$'+sbMV.toLocaleString('es-CR')+'/mes':'—';
   var ANYELO_KEY='anyelo';
   var proyAnye=APP.proyectos.map(function(p){
     var s=p.socios.find(function(x){return x.nombre.toLowerCase().includes('anyelo');});
@@ -1440,10 +1470,11 @@ function syncProyectosASheet(){
     body:JSON.stringify({key:API_KEY,accion:'reemplazar_todo',hoja:'Proyectos',filas:filas})})
   .then(function(r){return r.json();})
   .then(function(res){
-    if(res&&res.ok===false){console.log('Error sync proyectos: '+res.mensaje);return;}
+    if(res&&res.ok===false){toast('⚠ El proyecto NO se sincronizó con Sheets: '+(res.mensaje||'error')+'. Guardá de nuevo.',true);return;}
     document.getElementById('slbl').textContent='Sincronizado '+new Date().toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'});
+    toast('✅ Proyecto guardado y sincronizado');
   }).catch(function(){
-    console.log('Error sync proyectos (sin conexión)');
+    toast('⚠ Sin conexión con Sheets — el proyecto quedó solo en este dispositivo. Usá "Sync Sheets" cuando vuelva el internet.',true);
   });
 }
 
@@ -1583,6 +1614,26 @@ function buildDefaultPersonal(){
     deudas:[]};
 }
 
+// ── EDITAR SALARIO (dato personal, vive solo en este dispositivo) ──
+function abrirModalSalario(){
+  initPersonal();
+  document.getElementById('mss-bruto').value=APP.personal.salarioBruto||'';
+  document.getElementById('mss-neto').value=APP.personal.salarioNeto||'';
+  document.getElementById('mss-tc').value=APP.personal.tc||520;
+  document.getElementById('modal-salario').classList.add('open');
+}
+function guardarSalario(){
+  initPersonal();
+  APP.personal.salarioBruto=parseFloat(document.getElementById('mss-bruto').value)||0;
+  APP.personal.salarioNeto=parseFloat(document.getElementById('mss-neto').value)||0;
+  APP.personal.tc=parseFloat(document.getElementById('mss-tc').value)||520;
+  saveL();
+  cerrarModal('modal-salario');
+  renderMisFinanzas();
+  if(document.getElementById('p-mivista').classList.contains('active'))renderMiVista();
+  toast('✅ Salario actualizado');
+}
+
 function toUSD(m,mon){var tc=APP.personal?(APP.personal.tc||520):520;return mon==='USD'?m:m/tc;}
 function fmtM(m,mon){if(mon==='USD')return '$'+Math.round(m).toLocaleString('es-CR');return '\u20A1'+Math.round(m).toLocaleString('es-CR');}
 
@@ -1623,6 +1674,8 @@ function renderMisFinanzas(){
   initPersonal();
   var mc=calcMargen();
   var gast=calcGastadoMesUSD(PF_MES);
+  var sb=APP.personal.salarioBruto||0;
+  document.getElementById('pf-salario-bruto').textContent=sb>0?'$'+sb.toLocaleString('es-CR')+'/mes':'— agregar';
   document.getElementById('pf-stats').innerHTML=
     '<div><div class="pf-sv">$'+Math.round(mc.neto)+'</div><div class="pf-sl">Salario neto/mes</div></div>'+
     '<div style="opacity:.5;font-size:18px;align-self:center">−</div>'+
