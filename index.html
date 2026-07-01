@@ -1516,17 +1516,16 @@ function cargarDesdeSheets(callback){
 
 // ── INIT ──
 document.getElementById('n-f').valueAsDate=new Date();
-loadL();
-initRolSiActivo();
-renderPortafolio();
 
-// SEGURIDAD: los datos ya NO se cargan al abrir la página. Solo se traen desde
-// Google Sheets DESPUÉS de entrar con la contraseña (la API exige la llave).
-// El primer dato lo dispara aplicarRol() → pg('portafolio') tras el login.
-// (Antes existía aquí un bloque de datos de ejemplo con proveedores, montos y
-// nombres de socios reales escritos directamente en el código: se eliminó por
-// seguridad, ya que la fuente de verdad es Google Sheets protegido por la llave.)
+// SEGURIDAD: sin sesión activa NO se lee ni se dibuja NINGÚN dato.
+// - No se llama loadL() (así no se levanta ningún dato cacheado del navegador).
+// - No se dibuja el portafolio (así el DOM queda vacío detrás del login).
+// Los datos solo aparecen DESPUÉS de entrar con la contraseña, y se traen
+// frescos desde Google Sheets (que exige la llave). La fuente de verdad es
+// Google Sheets; el código público no contiene datos.
 if(usuarioActual&&API_KEY){
+  loadL();                 // cache local solo como respaldo offline del usuario logueado
+  initRolSiActivo();       // muestra Portafolio + refresca desde Sheets
   toast('⏳ Cargando datos…');
   refrescarDesdeSheetsSiPosible(function(){
     renderPortafolio();
@@ -1534,6 +1533,9 @@ if(usuarioActual&&API_KEY){
     if(document.getElementById('p-movimientos').classList.contains('active')){poblarSelectProyectos();renderTx();renderKPIs();}
     if(document.getElementById('p-finanzas').classList.contains('active')){poblarSelectProyectos();renderFin();}
   });
+} else {
+  // Sin sesión: memoria vacía, nada que mostrar. Solo se ve la pantalla de login.
+  APP.proyectos=[];APP.tx=[];
 }
 
 // Refresca desde Sheets al cambiar de pestaña. Si falla (sin internet), sigue
