@@ -808,7 +808,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.02.3';
+var APP_VERSION='2026.07.02.4';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1688,7 +1688,7 @@ function renderMiVista(){
   document.getElementById('mv-stats').innerHTML=
     '<div><div class="mv-sv">'+proyAnye.length+'</div><div class="mv-sl">Proyectos con participación</div></div>'+
     '<div><div class="mv-sv">$'+Math.round(totalCapital).toLocaleString('es-CR')+'</div><div class="mv-sl">Capital aportado total</div></div>'+
-    '<div><div class="mv-sv">~$'+Math.round(totalProy).toLocaleString('es-CR')+'</div><div class="mv-sl">Retorno esperado total</div></div>'+
+    '<div><div class="mv-sv">~$'+Math.round(totalProy).toLocaleString('es-CR')+'</div><div class="mv-sl">Retorno esperado total <span style="opacity:.6">(según simulador)</span></div></div>'+
     (totalReal>0?'<div><div class="mv-sv" style="color:var(--lime2)">$'+Math.round(totalReal).toLocaleString('es-CR')+'</div><div class="mv-sl">Retorno real registrado</div></div>':'')+
     '<div><div class="mv-sv">'+Math.round((totalCapital>0?(totalProy/totalCapital)*100:0))+'%</div><div class="mv-sl">ROI proyectado total</div></div>';
 
@@ -1900,7 +1900,7 @@ function renderCalendarioIngresos(proyAnye){
     h+='<span style="font-weight:700;color:var(--c-anyelo);font-family:JetBrains Mono,monospace">$'+Math.round(e.monto).toLocaleString('es-CR')+'</span>';
     h+='</div>';
   });
-  h+='<div style="font-size:10px;color:var(--ink4);margin-top:8px">⚠ Fechas y montos estimados según el ciclo de siembra y el simulador — la piña se paga el mismo día o al día siguiente de cosechar, no en cuotas.</div>';
+  h+='<div style="font-size:10px;color:var(--ink4);margin-top:8px">⚠ Estos montos NO son fijos: se recalculan al instante con los precios, rendimiento y mortalidad del simulador (pestaña Portafolio) — si los ajustás, este calendario cambia solo. La fecha es estimada según el ciclo de siembra. La piña se paga el mismo día o al día siguiente de cosechar, no en cuotas.</div>';
   h+='</div>';
   elCal.innerHTML=h;
 
