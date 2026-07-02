@@ -71,6 +71,10 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
 }
 .pulse-wrap{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--lime2);font-family:'JetBrains Mono',monospace;}
 .pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--lime2);animation:blink 2.5s infinite;}
+.pulse-dot.err{background:var(--red);animation:none;}
+.pulse-dot.wait{background:var(--sun);}
+.pulse-wrap.err span{color:var(--red);}
+.pulse-wrap.wait span{color:var(--sun);}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 .page{display:none;padding:20px 24px;max-width:1400px;margin:0 auto;}
 .page.active{display:block;}
@@ -319,6 +323,13 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
   </div>
 </div>
 
+
+<!-- ══ AVISO DE ACTUALIZACIÓN DISPONIBLE ══ -->
+<div id="update-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9998;background:var(--sun);color:#3a2c00;padding:9px 16px;text-align:center;font-size:12px;font-weight:700">
+  🔄 Hay una versión nueva del dashboard disponible.
+  <button onclick="location.reload()" style="margin-left:8px;background:#3a2c00;color:#fff;border:none;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">Actualizar ahora</button>
+</div>
+
 <nav>
   <div class="nav-icon">🍍</div>
   <div class="nav-brand">Finca <span>BizOS</span></div>
@@ -333,7 +344,8 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
     <div class="nav-spacer"></div>
     <span id="nav-usuario" style="font-size:11px;color:rgba(255,255,255,.5);margin-right:10px;font-weight:600"></span>
     <button onclick="sincronizarTodo()" class="nav-sync-btn" style="background:rgba(118,196,66,.15);border:1px solid rgba(118,196,66,.3);color:var(--lime2);padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:Plus Jakarta Sans,sans-serif;margin-right:8px">🔄 Sync Sheets</button>
-    <div class="pulse-wrap"><div class="pulse-dot"></div><span id="slbl">Live</span></div>
+    <div class="pulse-wrap" id="pulse-wrap" title="Estado de conexión con Google Sheets"><div class="pulse-dot" id="pulse-dot"></div><span id="slbl">Conectando…</span></div>
+    <span id="app-version" style="font-size:9px;color:rgba(255,255,255,.3);font-family:'JetBrains Mono',monospace;margin-left:8px"></span>
     <button class="logout-btn" onclick="doLogout()" style="margin-left:10px">↩ Salir</button>
   </div>
 </nav>
@@ -455,7 +467,10 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
 <div class="page" id="p-movimientos">
   <div class="ph">
     <div><div class="pt">Movimientos</div><div class="ps">Registro de ingresos y gastos · sincronizado con Google Sheets</div></div>
-    <button class="btn btn-primary" onclick="document.getElementById('modal-mov').classList.add('open')">+ Nuevo movimiento</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" onclick="abrirPapelera()">🗑 Papelera</button>
+      <button class="btn btn-primary" onclick="document.getElementById('modal-mov').classList.add('open')">+ Nuevo movimiento</button>
+    </div>
   </div>
   <div class="g4">
     <div class="kpi r"><div class="kl">Total gastos</div><div class="kv" id="m-g">$0</div><div class="ks" id="m-gn">0 registros</div></div>
@@ -732,10 +747,51 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
   </div>
 </div>
 
+<!-- ══ MODAL PAPELERA ══ -->
+<div class="overlay" id="modal-papelera">
+  <div class="modal" style="width:520px">
+    <div class="modal-title"><span>🗑 Papelera de movimientos</span><button class="modal-close" onclick="cerrarModal('modal-papelera')">✕</button></div>
+    <div style="font-size:11px;color:var(--ink4);margin-bottom:12px">Movimientos borrados por vos o por el otro usuario. Se pueden restaurar en cualquier momento.</div>
+    <div id="papelera-list"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX6qveSUh_PXnWQbEuBiC3Y80eEb10Ulu7-b5FiSckpNg/exec';
+
+// ── VERSIÓN Y AVISO DE ACTUALIZACIÓN ──
+// APP_VERSION se actualiza cada vez que se publica una mejora. El dashboard
+// se compara contra version.json (el mismo sitio publicado) cada pocos
+// minutos; si detecta un número mayor, avisa con un botón para recargar.
+// Así Jonathan nunca se queda usando una versión vieja sin saberlo.
+var APP_VERSION='2026.07.01.1';
+document.addEventListener('DOMContentLoaded',function(){
+  var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
+});
+function chequearActualizacion(){
+  fetch('version.json?t='+Date.now(),{cache:'no-store'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d&&d.version&&d.version!==APP_VERSION){
+        document.getElementById('update-banner').style.display='block';
+      }
+    }).catch(function(){/* sin conexión: no molestar con esto */});
+}
+setInterval(chequearActualizacion,5*60*1000); // cada 5 minutos mientras está abierto
+
+// ── INDICADOR DE CONEXIÓN REAL (ya no es decorativo) ──
+function marcarEstadoConexion(ok){
+  var wrap=document.getElementById('pulse-wrap');
+  var dot=document.getElementById('pulse-dot');
+  var lbl=document.getElementById('slbl');
+  if(!wrap)return;
+  wrap.className='pulse-wrap'+(ok?'':' err');
+  dot.className='pulse-dot'+(ok?'':' err');
+  var hora=new Date().toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'});
+  lbl.textContent=ok?('Live · '+hora):('Sin conexión · '+hora);
+}
 
 // ── LOGIN / LLAVE DE SEGURIDAD ──
 // La "contraseña" que se escribe ES la llave que protege la API (Apps Script).
@@ -839,7 +895,7 @@ var PRESUP_DEFAULT={
   'Mantenimiento Finca + Boom':3000,'Cosecha':3500
 };
 
-var APP={proyectos:[],tx:[],nextId:1,nextProjId:1};
+var APP={proyectos:[],tx:[],papelera:[],nextId:1,nextProjId:1};
 var TIPO='Gasto';
 var editandoProjId=null;
 
@@ -1217,26 +1273,66 @@ function renderTx(){
   renderKPIs();
 }
 
+// BORRADO SUAVE: la transacción se mueve a la Papelera (queda registrado
+// quién y cuándo la borró) en vez de desaparecer para siempre. Se puede
+// restaurar desde ahí. Esto evita accidentes irreversibles entre dos usuarios.
 function eliminarTx(id){
   var t=APP.tx.find(function(x){return x.id===id;});
   if(!t)return;
-  if(!confirm('¿Eliminar este movimiento?\n\n'+t.fecha+' · '+t.desc+' · $'+t.monto+'\n\nSe borra localmente y también del Google Sheet.'))return;
+  if(!confirm('¿Mover este movimiento a la Papelera?\n\n'+t.fecha+' · '+t.desc+' · $'+t.monto+'\n\nSe puede restaurar después desde "🗑 Papelera".'))return;
+  var quien=usuarioActual?usuarioActual.nombre:'';
+  t.eliminadoPor=quien;t.eliminadoEn=new Date().toISOString();
   APP.tx=APP.tx.filter(function(x){return x.id!==id;});
+  if(!APP.papelera)APP.papelera=[];
+  APP.papelera.unshift(t);
   saveL();
   renderTx();renderPortafolio();
   if(document.getElementById('p-mivista').classList.contains('active'))renderMiVista();
-  // Borrar también del lado del Sheet (idempotente: si ya no está, no pasa nada)
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body:JSON.stringify({key:API_KEY,accion:'eliminar_fila',hoja:'Transacciones',id:id})})
+    body:JSON.stringify({key:API_KEY,accion:'marcar_eliminado',hoja:'Transacciones',id:id,usuario:quien})})
   .then(function(r){return r.json();})
   .then(function(res){
-    if(res&&res.ok===false){toast('⚠ Se borró local pero falló en Sheets: '+(res.mensaje||''),true);}
-    else{
-      var s=getSyncedIds();s.delete(id);
-      try{localStorage.setItem('jorisu_synced_ids',JSON.stringify(Array.from(s)));}catch(e){}
-      toast('🗑 Movimiento eliminado (local + Sheets)');
-    }
-  }).catch(function(){toast('⚠ Se borró local — sin conexión con Sheets, revisá manualmente',true);});
+    if(res&&res.ok===false){toast('⚠ Se movió local pero falló en Sheets: '+(res.mensaje||''),true);}
+    else{toast('🗑 Movido a la Papelera');}
+  }).catch(function(){toast('⚠ Se movió local — sin conexión con Sheets, revisá manualmente',true);});
+}
+
+function restaurarTx(id){
+  var t=(APP.papelera||[]).find(function(x){return x.id===id;});
+  if(!t)return;
+  t.eliminadoPor='';t.eliminadoEn='';
+  APP.papelera=APP.papelera.filter(function(x){return x.id!==id;});
+  APP.tx.unshift(t);
+  APP.tx.sort(function(a,b){return b.id-a.id;});
+  saveL();
+  renderTx();renderPapelera();renderPortafolio();
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({key:API_KEY,accion:'restaurar_fila',hoja:'Transacciones',id:id})})
+  .then(function(r){return r.json();})
+  .then(function(res){
+    if(res&&res.ok===false){toast('⚠ Restaurado local pero falló en Sheets: '+(res.mensaje||''),true);}
+    else{toast('✅ Movimiento restaurado');}
+  }).catch(function(){toast('⚠ Restaurado local — sin conexión con Sheets',true);});
+}
+
+function abrirPapelera(){
+  document.getElementById('modal-papelera').classList.add('open');
+  renderPapelera();
+}
+function renderPapelera(){
+  var lista=APP.papelera||[];
+  var el=document.getElementById('papelera-list');
+  if(!lista.length){el.innerHTML='<div style="padding:24px;text-align:center;color:var(--ink4)"><div style="font-size:24px;margin-bottom:6px">🗑</div><div style="font-size:13px;font-weight:600">La papelera está vacía</div></div>';return;}
+  var h='';
+  lista.forEach(function(t){
+    var fecha=t.eliminadoEn?new Date(t.eliminadoEn).toLocaleString('es-CR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">';
+    h+='<div style="flex:1"><div style="font-size:13px;font-weight:700">'+t.desc+'</div>';
+    h+='<div style="font-size:11px;color:var(--ink4)">'+t.fecha+' · $'+parseFloat(t.monto).toLocaleString('es-CR')+' · borrado por '+(t.eliminadoPor||'?')+' el '+fecha+'</div></div>';
+    h+='<button class="btn btn-ghost btn-sm" onclick="restaurarTx('+t.id+')">↩ Restaurar</button>';
+    h+='</div>';
+  });
+  el.innerHTML=h;
 }
 
 function renderKPIs(){
@@ -1290,14 +1386,17 @@ function guardar(){
     proveedor:document.getElementById('n-p').value.trim(),
     socio:document.getElementById('n-s').value,
     cosecha:document.getElementById('n-c').value,
-    monto:m,notas:document.getElementById('n-n').value.trim()};
+    monto:m,notas:document.getElementById('n-n').value.trim(),
+    creadoPor:usuarioActual?usuarioActual.nombre:''};
   APP.tx.unshift(tx);saveL();
   var pnombre=APP.proyectos.find(function(p){return p.id===tx.projId;});
   var btn=document.getElementById('btn-sv');btn.disabled=true;btn.textContent='⏳ Guardando...';
   // Columna 13 = projId: amarra la transacción al proyecto por identidad,
   // no por nombre (así renombrar un proyecto no deja transacciones huérfanas).
+  // Columna 14 = creadoPor: quién la registró (queda de auditoría).
+  // Columnas 15-16 quedan vacías (se usan solo si la transacción se borra).
   var fila=[tx.id,tx.fecha,tx.tipo,tx.cat,tx.desc,tx.proveedor,tx.socio,tx.cosecha,
-    (tx.tipo==='Gasto'?-tx.monto:tx.monto),tx.notas,tx.socio,pnombre?pnombre.nombre:'',tx.projId||''];
+    (tx.tipo==='Gasto'?-tx.monto:tx.monto),tx.notas,tx.socio,pnombre?pnombre.nombre:'',tx.projId||'',tx.creadoPor,'',''];
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify({key:API_KEY,accion:'agregar_fila',hoja:'Transacciones',fila:fila})})
   .then(function(r){return r.json();})
@@ -1556,7 +1655,7 @@ function syncTxASheet(tx){
   if(isSynced(tx.id))return Promise.resolve();
   var p=APP.proyectos.find(function(x){return x.id===tx.projId;});
   var fila=[tx.id,tx.fecha,tx.tipo,tx.cat,tx.desc,tx.proveedor||'',tx.socio||'',
-    tx.cosecha||'',(tx.tipo==='Gasto'?-tx.monto:tx.monto),tx.notas||'',tx.socio||'',p?p.nombre:'',tx.projId||''];
+    tx.cosecha||'',(tx.tipo==='Gasto'?-tx.monto:tx.monto),tx.notas||'',tx.socio||'',p?p.nombre:'',tx.projId||'',tx.creadoPor||'','',''];
   return fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify({key:API_KEY,accion:'agregar_fila',hoja:'Transacciones',fila:fila})})
   .then(function(r){return r.json();})
@@ -1591,7 +1690,7 @@ function cargarDesdeSheets(callback){
   fetch(SCRIPT_URL+'?accion=leer&key='+encodeURIComponent(API_KEY||''),{method:'GET'})
     .then(function(r){return r.json();})
     .then(function(data){
-      if(!data||data.ok===false){callback&&callback(false);return;}
+      if(!data||data.ok===false){marcarEstadoConexion(false);callback&&callback(false);return;}
       if(Array.isArray(data.proyectos)&&data.proyectos.length){
         APP.proyectos=data.proyectos.map(function(p){
           var socios=[];try{socios=JSON.parse(p[10]||'[]');}catch(e){}
@@ -1604,6 +1703,7 @@ function cargarDesdeSheets(callback){
       }
       if(Array.isArray(data.transacciones)&&data.transacciones.length){
         var idsVistos=getSyncedIds();
+        APP.papelera=[];
         APP.tx=data.transacciones.map(function(t){
           var id=parseInt(t[0]);idsVistos.add(id);
           // Amarre por ID de proyecto (columna 13); si la fila es vieja y no
@@ -1613,14 +1713,19 @@ function cargarDesdeSheets(callback){
           if(!proj)proj=APP.proyectos.find(function(p){return p.nombre===t[11];});
           var monto=parseFloat(t[8])||0;
           return {id:id,projId:proj?proj.id:null,fecha:t[1],tipo:t[2],cat:t[3],desc:t[4],
-            proveedor:t[5]||'',socio:t[6]||'',cosecha:t[7]||'',monto:Math.abs(monto),notas:t[9]||''};
+            proveedor:t[5]||'',socio:t[6]||'',cosecha:t[7]||'',monto:Math.abs(monto),notas:t[9]||'',
+            creadoPor:t[13]||'',eliminadoPor:t[14]||'',eliminadoEn:t[15]||''};
         }).sort(function(a,b){return b.id-a.id;});
-        APP.nextId=Math.max.apply(null,APP.tx.map(function(t){return t.id;}))+1;
+        // Separar en activas (visibles) vs papelera (borrado suave, recuperable)
+        APP.papelera=APP.tx.filter(function(t){return t.eliminadoPor;});
+        APP.tx=APP.tx.filter(function(t){return !t.eliminadoPor;});
+        APP.nextId=Math.max.apply(null,APP.tx.concat(APP.papelera).map(function(t){return t.id;}).concat([0]))+1;
         try{localStorage.setItem('jorisu_synced_ids',JSON.stringify(Array.from(idsVistos)));}catch(e){}
       }
       saveL();
+      marcarEstadoConexion(true);
       callback&&callback(true);
-    }).catch(function(){callback&&callback(false);});
+    }).catch(function(){marcarEstadoConexion(false);callback&&callback(false);});
 }
 
 // ── INIT ──
@@ -1635,6 +1740,7 @@ document.getElementById('n-f').valueAsDate=new Date();
 if(usuarioActual&&API_KEY){
   loadL();                 // cache local solo como respaldo offline del usuario logueado
   initRolSiActivo();       // muestra Portafolio + refresca desde Sheets
+  chequearActualizacion();
   toast('⏳ Cargando datos…');
   refrescarDesdeSheetsSiPosible(function(){
     renderPortafolio();
