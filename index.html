@@ -1294,8 +1294,10 @@ function guardar(){
   APP.tx.unshift(tx);saveL();
   var pnombre=APP.proyectos.find(function(p){return p.id===tx.projId;});
   var btn=document.getElementById('btn-sv');btn.disabled=true;btn.textContent='⏳ Guardando...';
+  // Columna 13 = projId: amarra la transacción al proyecto por identidad,
+  // no por nombre (así renombrar un proyecto no deja transacciones huérfanas).
   var fila=[tx.id,tx.fecha,tx.tipo,tx.cat,tx.desc,tx.proveedor,tx.socio,tx.cosecha,
-    (tx.tipo==='Gasto'?-tx.monto:tx.monto),tx.notas,tx.socio,pnombre?pnombre.nombre:''];
+    (tx.tipo==='Gasto'?-tx.monto:tx.monto),tx.notas,tx.socio,pnombre?pnombre.nombre:'',tx.projId||''];
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify({key:API_KEY,accion:'agregar_fila',hoja:'Transacciones',fila:fila})})
   .then(function(r){return r.json();})
@@ -1554,7 +1556,7 @@ function syncTxASheet(tx){
   if(isSynced(tx.id))return Promise.resolve();
   var p=APP.proyectos.find(function(x){return x.id===tx.projId;});
   var fila=[tx.id,tx.fecha,tx.tipo,tx.cat,tx.desc,tx.proveedor||'',tx.socio||'',
-    tx.cosecha||'',(tx.tipo==='Gasto'?-tx.monto:tx.monto),tx.notas||'',tx.socio||'',p?p.nombre:''];
+    tx.cosecha||'',(tx.tipo==='Gasto'?-tx.monto:tx.monto),tx.notas||'',tx.socio||'',p?p.nombre:'',tx.projId||''];
   return fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify({key:API_KEY,accion:'agregar_fila',hoja:'Transacciones',fila:fila})})
   .then(function(r){return r.json();})
@@ -1604,7 +1606,11 @@ function cargarDesdeSheets(callback){
         var idsVistos=getSyncedIds();
         APP.tx=data.transacciones.map(function(t){
           var id=parseInt(t[0]);idsVistos.add(id);
-          var proj=APP.proyectos.find(function(p){return p.nombre===t[11];});
+          // Amarre por ID de proyecto (columna 13); si la fila es vieja y no
+          // lo tiene, cae al amarre por nombre (compatibilidad hacia atrás).
+          var pid=parseInt(t[12]);
+          var proj=(!isNaN(pid)&&pid)?APP.proyectos.find(function(p){return p.id===pid;}):null;
+          if(!proj)proj=APP.proyectos.find(function(p){return p.nombre===t[11];});
           var monto=parseFloat(t[8])||0;
           return {id:id,projId:proj?proj.id:null,fecha:t[1],tipo:t[2],cat:t[3],desc:t[4],
             proveedor:t[5]||'',socio:t[6]||'',cosecha:t[7]||'',monto:Math.abs(monto),notas:t[9]||''};
@@ -1706,6 +1712,43 @@ function guardarSalario(){
   toast('✅ Salario actualizado');
 }
 
+// ── RESPALDO DE DATOS PERSONALES ──
+// Los datos personales (salario, gastos, deudas) viven SOLO en este dispositivo.
+// Estos botones permiten descargarlos como archivo y restaurarlos en otro
+// dispositivo o después de limpiar el navegador.
+function exportarPersonal(){
+  initPersonal();
+  var data={app:'FincaBizOS',tipo:'respaldo-personal',exportado:new Date().toISOString(),personal:APP.personal};
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='respaldo-personal-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  toast('✅ Respaldo descargado — guardalo en un lugar seguro');
+}
+function importarPersonal(){
+  var inp=document.createElement('input');
+  inp.type='file';inp.accept='.json,application/json';
+  inp.onchange=function(){
+    var f=inp.files[0];if(!f)return;
+    var r=new FileReader();
+    r.onload=function(){
+      try{
+        var d=JSON.parse(r.result);
+        if(!d||d.tipo!=='respaldo-personal'||!d.personal)throw new Error('formato');
+        if(!confirm('¿Reemplazar los datos personales de ESTE dispositivo con el respaldo del '+String(d.exportado||'').slice(0,10)+'?\n\nEsto no toca los datos de la empresa (esos viven en Google Sheets).'))return;
+        APP.personal=d.personal;
+        saveL();
+        renderMisFinanzas();
+        toast('✅ Respaldo restaurado');
+      }catch(e){toast('⚠ Ese archivo no es un respaldo válido',true);}
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+
 function toUSD(m,mon){var tc=APP.personal?(APP.personal.tc||520):520;return mon==='USD'?m:m/tc;}
 function fmtM(m,mon){if(mon==='USD')return '$'+Math.round(m).toLocaleString('es-CR');return '\u20A1'+Math.round(m).toLocaleString('es-CR');}
 
@@ -1721,19 +1764,23 @@ function calcMargen(){
 }
 
 // ── NAVEGACIÓN ──
+function pfActions(id){
+  var acts=document.getElementById('pf-actions');
+  if(!acts)return;
+  if(id==='gastos')acts.innerHTML='<button class="btn btn-primary" onclick="abrirModalGastoDiario()">+ Registrar gasto</button>';
+  else if(id==='presupuesto')acts.innerHTML='<button class="btn btn-ghost" onclick="abrirModalCategoria()">+ Categoría</button>';
+  else if(id==='deudas')acts.innerHTML='<button class="btn btn-ghost" onclick="abrirModalDeuda()">+ Deuda / Cuota</button>';
+  else if(id==='resumen')acts.innerHTML='<button class="btn btn-ghost btn-sm" onclick="exportarPersonal()" title="Descarga un archivo con tus datos personales (salario, gastos, deudas) como respaldo">⬇ Respaldar</button><button class="btn btn-ghost btn-sm" onclick="importarPersonal()" title="Restaura tus datos personales desde un archivo de respaldo">⬆ Restaurar</button>';
+  else acts.innerHTML='';
+}
+
 function pfTab(id,btn){
   document.querySelectorAll('.pft').forEach(function(el){el.style.display='none';});
   document.querySelectorAll('.pf-tab').forEach(function(b){b.classList.remove('active');});
   document.getElementById('pft-'+id).style.display='block';
   if(btn)btn.classList.add('active');
   PF_TAB=id;
-  var acts=document.getElementById('pf-actions');
-  if(acts){
-    if(id==='gastos')acts.innerHTML='<button class="btn btn-primary" onclick="abrirModalGastoDiario()">+ Registrar gasto</button>';
-    else if(id==='presupuesto')acts.innerHTML='<button class="btn btn-ghost" onclick="abrirModalCategoria()">+ Categoría</button>';
-    else if(id==='deudas')acts.innerHTML='<button class="btn btn-ghost" onclick="abrirModalDeuda()">+ Deuda / Cuota</button>';
-    else acts.innerHTML='';
-  }
+  pfActions(id);
   if(id==='resumen')renderPFResumen();
   else if(id==='presupuesto')renderPFPresupuesto();
   else if(id==='gastos')renderPFGastos();
@@ -1744,6 +1791,7 @@ function pfTab(id,btn){
 
 function renderMisFinanzas(){
   initPersonal();
+  pfActions(PF_TAB);
   var mc=calcMargen();
   var gast=calcGastadoMesUSD(PF_MES);
   var sb=APP.personal.salarioBruto||0;
