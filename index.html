@@ -769,6 +769,23 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
   </div>
 </div>
 
+<!-- ══ MODAL PRECIOS MERCADO NACIONAL (POR CALIBRE) ══ -->
+<div class="overlay" id="modal-calibres">
+  <div class="modal" style="width:480px">
+    <div class="modal-title"><span>⚙ Mercado nacional · precios por calibre</span><button class="modal-close" onclick="cerrarModal('modal-calibres')">✕</button></div>
+    <div style="font-size:11px;color:var(--ink4);margin-bottom:12px">En el mercado nacional se paga por unidad de fruta según su tamaño, no por kg. Estos precios y el % esperado de cada calibre son compartidos — los ve Anyelo y Jonathan por igual.</div>
+    <div id="calibres-rows"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px 10px;background:var(--fog);border-radius:6px">
+      <span style="font-size:11px;color:var(--ink3)">Total % de la cosecha nacional:</span>
+      <span style="font-size:13px;font-weight:800;font-family:'JetBrains Mono',monospace" id="calibres-pct-total">0%</span>
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-calibres')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarCalibres()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -779,7 +796,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.01.3';
+var APP_VERSION='2026.07.02.1';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -936,11 +953,73 @@ var PRECIOS_BASE=[
   {key:'ind',label:'Industria',color:'#d63031',precio:0.20,pct:10,ref:0.20}
 ];
 
+// Sincronización con debounce: agrupa varios cambios seguidos (ej. arrastrar
+// un input del simulador) en un solo guardado a Sheets, en vez de uno por
+// cada tecla/click. syncTimer se comparte entre todas las llamadas.
+var syncProyectosTimer=null;
+function syncProyectosASheetDebounced(){
+  if(syncProyectosTimer)clearTimeout(syncProyectosTimer);
+  syncProyectosTimer=setTimeout(function(){syncProyectosASheet(true);},900);
+}
+
 var PRESUP_DEFAULT={
   'Alquiler terreno':650,'Preparación terreno':1500,
   'Compra semilla + Siembra Integral':6000,'Aplicaciones Paquete Técnico':6000,
   'Mantenimiento Finca + Boom':3000,'Cosecha':3500
 };
+
+// ── MERCADO NACIONAL POR CALIBRE ──
+// En Costa Rica el mercado nacional NO paga por kg: paga por UNIDAD de fruta,
+// según su tamaño. Estos son los precios de referencia (colones) y la
+// distribución de calibres esperada — ambos editables desde el dashboard, y
+// compartidos entre Anyelo y Jonathan vía la hoja "Config" del Sheet.
+var CALIBRES_NACIONAL_DEFAULT=[
+  {clave:'grande',label:'Grande (≥2.5 kg)',precioCRC:700,pct:20},
+  {clave:'mediana',label:'Mediana (2–2.5 kg)',precioCRC:575,pct:30},
+  {clave:'peq2',label:'1.6–2 kg',precioCRC:475,pct:25},
+  {clave:'peq1',label:'1.2–1.6 kg',precioCRC:325,pct:15},
+  {clave:'chica',label:'Chica (~1 kg)',precioCRC:175,pct:10}
+];
+var APP_CALIBRES=JSON.parse(JSON.stringify(CALIBRES_NACIONAL_DEFAULT));
+
+function abrirModalCalibres(){
+  renderCalibresRows();
+  document.getElementById('modal-calibres').classList.add('open');
+}
+function renderCalibresRows(){
+  var h='';
+  APP_CALIBRES.forEach(function(c,i){
+    h+='<div style="display:grid;grid-template-columns:1fr 90px 70px;gap:8px;align-items:end;margin-bottom:8px;padding:8px 10px;background:var(--fog);border:1px solid var(--border);border-radius:8px">';
+    h+='<div class="field" style="gap:2px"><label style="font-size:9px">Calibre</label><div style="font-size:12px;font-weight:700;padding:6px 0">'+c.label+'</div></div>';
+    h+='<div class="field" style="gap:2px"><label style="font-size:9px">₡ / fruta</label><input type="number" value="'+c.precioCRC+'" min="0" step="5" class="fi" style="font-size:12px;padding:5px 8px" oninput="APP_CALIBRES['+i+'].precioCRC=parseFloat(this.value)||0">'+
+      '</div>';
+    h+='<div class="field" style="gap:2px"><label style="font-size:9px">% cosecha</label><input type="number" value="'+c.pct+'" min="0" max="100" step="1" class="fi" style="font-size:12px;padding:5px 8px" oninput="APP_CALIBRES['+i+'].pct=parseFloat(this.value)||0;calcCalibresTotal()"></div>';
+    h+='</div>';
+  });
+  document.getElementById('calibres-rows').innerHTML=h;
+  calcCalibresTotal();
+}
+function calcCalibresTotal(){
+  var total=APP_CALIBRES.reduce(function(s,c){return s+(parseFloat(c.pct)||0);},0);
+  var el=document.getElementById('calibres-pct-total');
+  el.textContent=total.toFixed(0)+'%';
+  el.style.color=Math.abs(total-100)<1?'var(--leaf)':'var(--red)';
+}
+function guardarCalibres(){
+  var total=APP_CALIBRES.reduce(function(s,c){return s+(parseFloat(c.pct)||0);},0);
+  if(Math.abs(total-100)>1){toast('⚠ El % de calibres debe sumar 100%',true);return;}
+  cerrarModal('modal-calibres');
+  toast('⏳ Guardando…');
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({key:API_KEY,accion:'reemplazar_todo',hoja:'Config',filas:[['calibres_nacional',JSON.stringify(APP_CALIBRES)]]})})
+  .then(function(r){return r.json();})
+  .then(function(res){
+    if(res&&res.ok===false){toast('⚠ No se pudo guardar en Sheets: '+(res.mensaje||'')+' (¿existe la hoja "Config"?)',true);return;}
+    toast('✅ Precios de mercado nacional actualizados');
+    renderPortafolio();
+    if(document.getElementById('p-mivista').classList.contains('active'))renderMiVista();
+  }).catch(function(){toast('⚠ Sin conexión — no se pudo guardar en Sheets',true);});
+}
 
 var APP={proyectos:[],tx:[],papelera:[],nextId:1,nextProjId:1};
 var TIPO='Gasto';
@@ -1104,7 +1183,7 @@ function guardarProyecto(){
       else{toast('⚠ Ese proyecto ya no existe en Sheets (¿lo borró el otro usuario?)',true);cerrarModal('modal-proj');renderPortafolio();return;}
     } else {
       var precios=JSON.parse(JSON.stringify(PRECIOS_BASE));
-      APP.proyectos.push({id:APP.nextProjId++,nombre:nombre,cultivo:cultivo,ha:ha,plantas:plantas,inv:inv,ciclo:ciclo,siembra:siembra,socios:socios,color:colorSeleccionado,precios:precios,rend:100,mort:5,activo:true});
+      APP.proyectos.push({id:APP.nextProjId++,nombre:nombre,cultivo:cultivo,ha:ha,plantas:plantas,inv:inv,ciclo:ciclo,siembra:siembra,socios:socios,color:colorSeleccionado,precios:precios,rend:100,mort:5,activo:true,presupuesto:JSON.parse(JSON.stringify(PRESUP_DEFAULT))});
     }
     saveL();
     cerrarModal('modal-proj');
@@ -1170,25 +1249,34 @@ function renderPortafolio(){
     h+='<div style="font-size:11px;color:var(--leaf);font-weight:600;margin-bottom:10px">✎ Simulador · editá precios en tiempo real</div>';
     h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">';
     p.precios.forEach(function(pr,i){
+      var esNacional=pr.key==='nac';
+      var precioProm=(APP_CALIBRES||CALIBRES_NACIONAL_DEFAULT).reduce(function(s,c){return s+(c.pct/100)*c.precioCRC;},0);
       h+='<div style="border:1px solid var(--border);border-radius:8px;padding:10px;background:#fff">';
       h+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:'+pr.color+';margin-bottom:5px">'+pr.label+'</div>';
-      h+='<div style="display:flex;align-items:baseline;gap:2px">';
-      h+='<span style="font-size:11px;color:var(--ink4)">$</span>';
-      h+='<input type="number" value="'+pr.precio+'" min="0.01" max="2" step="0.01" ';
-      h+='style="font-size:17px;font-weight:800;color:'+pr.color+';border:none;border-bottom:2px dashed var(--border);background:none;outline:none;width:65px;font-family:Plus Jakarta Sans,sans-serif" ';
-      h+='oninput="APP.proyectos.find(function(x){return x.id==='+p.id+'}).precios['+i+'].precio=parseFloat(this.value)||0;saveL();refreshProyecto('+p.id+')" >';
-      h+='<span style="font-size:10px;color:var(--ink4)">/kg</span></div>';
+      if(esNacional){
+        h+='<div style="display:flex;align-items:baseline;gap:2px">';
+        h+='<span style="font-size:15px;font-weight:800;color:'+pr.color+'">₡'+Math.round(precioProm)+'</span>';
+        h+='<span style="font-size:10px;color:var(--ink4)">prom/fruta</span></div>';
+        h+='<button onclick="abrirModalCalibres()" style="font-size:9px;color:var(--sky);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;margin-top:2px">⚙ editar por calibre</button>';
+      } else {
+        h+='<div style="display:flex;align-items:baseline;gap:2px">';
+        h+='<span style="font-size:11px;color:var(--ink4)">$</span>';
+        h+='<input type="number" value="'+pr.precio+'" min="0.01" max="2" step="0.01" ';
+        h+='style="font-size:17px;font-weight:800;color:'+pr.color+';border:none;border-bottom:2px dashed var(--border);background:none;outline:none;width:65px;font-family:Plus Jakarta Sans,sans-serif" ';
+        h+='oninput="APP.proyectos.find(function(x){return x.id==='+p.id+'}).precios['+i+'].precio=parseFloat(this.value)||0;saveL();refreshProyecto('+p.id+');syncProyectosASheetDebounced()" >';
+        h+='<span style="font-size:10px;color:var(--ink4)">/kg</span></div>';
+      }
       h+='<div style="display:flex;align-items:center;gap:4px;margin-top:4px">';
       h+='<input type="number" value="'+pr.pct+'" min="0" max="100" step="5" ';
       h+='style="font-size:11px;font-weight:700;border:1px solid var(--border);border-radius:4px;padding:2px 5px;width:44px;background:var(--fog);font-family:Plus Jakarta Sans,sans-serif" ';
-      h+='oninput="APP.proyectos.find(function(x){return x.id==='+p.id+'}).precios['+i+'].pct=parseFloat(this.value)||0;saveL();refreshProyecto('+p.id+')">';
+      h+='oninput="APP.proyectos.find(function(x){return x.id==='+p.id+'}).precios['+i+'].pct=parseFloat(this.value)||0;saveL();refreshProyecto('+p.id+');syncProyectosASheetDebounced()">';
       h+='<span style="font-size:9px;color:var(--ink4)">%</span></div></div>';
     });
     h+='</div>';
     h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
-    h+='<div class="field"><label>Rendimiento ton/ha</label><input type="number" value="'+p.rend+'" min="50" max="150" step="1" class="fi" style="font-size:12px" oninput="APP.proyectos.find(function(x){return x.id==='+p.id+'}).rend=parseFloat(this.value)||100;saveL();refreshProyecto('+p.id+')"></div>';
-    h+='<div class="field"><label>Hectáreas</label><input type="number" value="'+p.ha+'" min="0.5" max="10" step="0.5" class="fi" style="font-size:12px" oninput="APP.proyectos.find(function(x){return x.id==='+p.id+'}).ha=parseFloat(this.value)||1.5;saveL();refreshProyecto('+p.id+')"></div>';
-    h+='<div class="field"><label>Mortalidad %</label><input type="number" value="'+p.mort+'" min="0" max="20" step="1" class="fi" style="font-size:12px" oninput="APP.proyectos.find(function(x){return x.id==='+p.id+'}).mort=parseFloat(this.value)||5;saveL();refreshProyecto('+p.id+')"></div>';
+    h+='<div class="field"><label>Rendimiento ton/ha</label><input type="number" value="'+p.rend+'" min="50" max="150" step="1" class="fi" style="font-size:12px" oninput="APP.proyectos.find(function(x){return x.id==='+p.id+'}).rend=parseFloat(this.value)||100;saveL();refreshProyecto('+p.id+');syncProyectosASheetDebounced()"></div>';
+    h+='<div class="field"><label>Hectáreas</label><input type="number" value="'+p.ha+'" min="0.5" max="10" step="0.5" class="fi" style="font-size:12px" oninput="APP.proyectos.find(function(x){return x.id==='+p.id+'}).ha=parseFloat(this.value)||1.5;saveL();refreshProyecto('+p.id+');syncProyectosASheetDebounced()"></div>';
+    h+='<div class="field"><label>Mortalidad %</label><input type="number" value="'+p.mort+'" min="0" max="20" step="1" class="fi" style="font-size:12px" oninput="APP.proyectos.find(function(x){return x.id==='+p.id+'}).mort=parseFloat(this.value)||5;saveL();refreshProyecto('+p.id+');syncProyectosASheetDebounced()"></div>';
     h+='</div>';
     var ton=p.ha*(p.rend||100)*(1-(p.mort||5)/100);
     var ingB=calcIngreso(p);var ganN=calcGanancia(p);var roi=p.inv>0?Math.round((ganN/p.inv)*100):0;
@@ -1266,9 +1354,23 @@ function editarProyecto(pid){
   document.getElementById('modal-proj').classList.add('open');
 }
 
+var TC_MERCADO=520; // colones por dólar, referencia para convertir el mercado nacional (que cotiza en ₡)
+
 function calcIngreso(p){
   var ton=p.ha*(p.rend||100)*(1-(p.mort||5)/100);
-  var ing=0;(p.precios||PRECIOS_BASE).forEach(function(pr){ing+=ton*(pr.pct/100)*1000*pr.precio;});
+  var plantasTotales=(p.plantas||65000)*p.ha*(1-(p.mort||5)/100);
+  var ing=0;
+  (p.precios||PRECIOS_BASE).forEach(function(pr){
+    if(pr.key==='nac'){
+      // Mercado nacional: se paga por UNIDAD de fruta según su calibre, no por kg.
+      // plantasCanal = cuántas frutas de esta cosecha van al canal nacional.
+      var plantasCanal=plantasTotales*(pr.pct/100);
+      var precioPromedioCRC=(APP_CALIBRES||CALIBRES_NACIONAL_DEFAULT).reduce(function(s,c){return s+(c.pct/100)*c.precioCRC;},0);
+      ing+=plantasCanal*precioPromedioCRC/TC_MERCADO;
+    } else {
+      ing+=ton*(pr.pct/100)*1000*pr.precio;
+    }
+  });
   return ing;
 }
 function calcGanancia(p){return calcIngreso(p)-p.inv;}
@@ -1405,21 +1507,36 @@ function renderFin(){
   var fp=document.getElementById('fin-proj-sel').value;
   var proj=fp?APP.proyectos.find(function(p){return String(p.id)===fp;}):APP.proyectos[0];
   if(!proj){document.getElementById('fin-bars').innerHTML='<p style="color:var(--ink4)">Seleccioná un proyecto.</p>';return;}
+  if(!proj.presupuesto)proj.presupuesto=JSON.parse(JSON.stringify(PRESUP_DEFAULT));
   var gts=APP.tx.filter(function(t){return t.tipo==='Gasto'&&(!fp||String(t.projId)===fp);});
   var cats={};gts.forEach(function(t){cats[t.cat]=(cats[t.cat]||0)+parseFloat(t.monto);});
   var tot=Object.values(cats).reduce(function(s,v){return s+v;},0);
   document.getElementById('fin-tag').textContent='Total real: $'+tot.toLocaleString('es-CR',{minimumFractionDigits:0});
-  var presup=PRESUP_DEFAULT;var h='';
+  var presup=proj.presupuesto;var h='';
+  h+='<div style="font-size:10px;color:var(--ink4);margin-bottom:12px">Presupuesto de <b>'+proj.nombre+'</b> · editá el monto de cada meta, se guarda para vos y Jonathan.</div>';
   Object.keys(presup).forEach(function(cat){
     var real=cats[cat]||0;var pres=presup[cat];
-    var pct=Math.min(Math.round((real/pres)*100),130);
+    var pct=pres>0?Math.min(Math.round((real/pres)*100),130):0;
     var col=pct>100?'var(--red)':pct>70?'var(--sun)':'var(--leaf2)';
-    h+='<div style="margin-bottom:15px"><div style="display:flex;justify-content:space-between;margin-bottom:5px">';
+    h+='<div style="margin-bottom:15px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">';
     h+='<span style="font-size:12px;font-weight:600;color:var(--ink2)">'+cat+'</span>';
-    h+='<span style="font-size:11px;font-family:JetBrains Mono,monospace;color:var(--ink3)">$'+real.toLocaleString('es-CR')+' / $'+pres.toLocaleString('es-CR')+' <span style="color:'+col+';font-weight:700">('+pct+'%)</span></span></div>';
+    h+='<span style="font-size:11px;font-family:JetBrains Mono,monospace;color:var(--ink3);display:flex;align-items:center;gap:4px">$'+real.toLocaleString('es-CR')+' / $'+
+      '<input type="number" value="'+pres+'" min="0" step="50" data-cat="'+cat.replace(/"/g,'&quot;')+'" '+
+      'style="width:70px;border:1px solid var(--border);border-radius:4px;padding:1px 4px;font-family:JetBrains Mono,monospace;font-size:11px;background:var(--fog)" '+
+      'onchange="actualizarPresupuesto('+proj.id+',this.dataset.cat,this.value)">'+
+      ' <span style="color:'+col+';font-weight:700">('+pct+'%)</span></span></div>';
     h+='<div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:4px;transition:width 1s ease"></div></div></div>';
   });
   document.getElementById('fin-bars').innerHTML=h;
+}
+function actualizarPresupuesto(projId,cat,valor){
+  var p=APP.proyectos.find(function(x){return x.id===projId;});
+  if(!p)return;
+  if(!p.presupuesto)p.presupuesto=JSON.parse(JSON.stringify(PRESUP_DEFAULT));
+  p.presupuesto[cat]=parseFloat(valor)||0;
+  saveL();
+  syncProyectosASheetDebounced();
+  renderFin();
 }
 
 function guardar(){
@@ -1675,14 +1792,20 @@ function renderCruce(proyAnye){
 
 // ── SYNC CON SHEET ──
 
-function syncProyectosASheet(){
+function syncProyectosASheet(silencioso){
   if(APP.proyectos.length===0)return;
   var filas=APP.proyectos.map(function(p){
     return [
       p.id, p.nombre, p.cultivo||'', p.ha||1.5, p.plantas||65000,
       p.inv||0, p.ciclo||'PC', p.siembra||'', p.color||'',
       p.activo?'Sí':'No',
-      JSON.stringify(p.socios||[])
+      JSON.stringify(p.socios||[]),
+      // Columnas nuevas: precios/rend/mort del simulador y presupuesto por
+      // categoría — así lo que ajusta un usuario lo ve el otro (integral,
+      // no solo en su propio navegador).
+      JSON.stringify((p.precios||[]).map(function(pr){return{key:pr.key,precio:pr.precio,pct:pr.pct};})),
+      p.rend||100, p.mort||5,
+      JSON.stringify(p.presupuesto||PRESUP_DEFAULT)
     ];
   });
   // 'reemplazar_todo' es idempotente por diseño (borra y reescribe), no genera duplicados
@@ -1692,9 +1815,9 @@ function syncProyectosASheet(){
   .then(function(res){
     if(res&&res.ok===false){toast('⚠ El proyecto NO se sincronizó con Sheets: '+(res.mensaje||'error')+'. Guardá de nuevo.',true);return;}
     document.getElementById('slbl').textContent='Sincronizado '+new Date().toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'});
-    toast('✅ Proyecto guardado y sincronizado');
+    if(!silencioso)toast('✅ Proyecto guardado y sincronizado');
   }).catch(function(){
-    toast('⚠ Sin conexión con Sheets — el proyecto quedó solo en este dispositivo. Usá "Sync Sheets" cuando vuelva el internet.',true);
+    if(!silencioso)toast('⚠ Sin conexión con Sheets — el proyecto quedó solo en este dispositivo. Usá "Sync Sheets" cuando vuelva el internet.',true);
   });
 }
 
@@ -1741,12 +1864,37 @@ function cargarDesdeSheets(callback){
       if(Array.isArray(data.proyectos)&&data.proyectos.length){
         APP.proyectos=data.proyectos.map(function(p){
           var socios=[];try{socios=JSON.parse(p[10]||'[]');}catch(e){}
+          // Precios guardados (col 12): si existen, se combinan con PRECIOS_BASE
+          // (por label/color) para no perder esos datos visuales; si la fila es
+          // vieja y no los tiene, se usan los valores por defecto.
+          var precios=JSON.parse(JSON.stringify(PRECIOS_BASE));
+          if(p[11]){
+            try{
+              var guardados=JSON.parse(p[11]);
+              precios=precios.map(function(base){
+                var g=guardados.find(function(x){return x.key===base.key;});
+                return g?Object.assign({},base,{precio:g.precio,pct:g.pct}):base;
+              });
+            }catch(e){}
+          }
+          var presupuesto=PRESUP_DEFAULT;
+          if(p[14]){try{presupuesto=JSON.parse(p[14]);}catch(e){}}
           return {id:parseInt(p[0]),nombre:p[1],cultivo:p[2],ha:parseFloat(p[3])||1.5,
             plantas:parseInt(p[4])||65000,inv:parseFloat(p[5])||0,ciclo:p[6],siembra:p[7],
             color:p[8]||'#1a5c2e',activo:p[9]==='Sí',socios:socios,
-            precios:JSON.parse(JSON.stringify(PRECIOS_BASE)),rend:100,mort:5};
+            precios:precios,rend:parseFloat(p[12])||100,mort:parseFloat(p[13])||5,
+            presupuesto:presupuesto};
         });
         APP.nextProjId=Math.max.apply(null,APP.proyectos.map(function(p){return p.id;}))+1;
+      }
+      // Config: valores compartidos que no son ni proyecto ni transacción.
+      // Formato de cada fila: [clave, valorJSON]. Hoy solo usamos
+      // 'calibres_nacional' (precios del mercado nacional por tamaño de fruta).
+      if(Array.isArray(data.config)&&data.config.length){
+        var filaCalibres=data.config.find(function(r){return r[0]==='calibres_nacional';});
+        if(filaCalibres&&filaCalibres[1]){
+          try{var c=JSON.parse(filaCalibres[1]);if(Array.isArray(c)&&c.length)APP_CALIBRES=c;}catch(e){}
+        }
       }
       if(Array.isArray(data.transacciones)&&data.transacciones.length){
         var idsVistos=getSyncedIds();
