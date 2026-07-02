@@ -3,10 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Finca · BizOS</title>
+<title>Costa Piña</title>
 <style>
-#login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0d2e1a,#1a5c2e);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;}
-.login-box{background:#fff;border-radius:16px;padding:36px 32px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+#login-screen{position:fixed;inset:0;background:linear-gradient(160deg,#0a2415,#0d2e1a 45%,#1a5c2e 100%);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;overflow:hidden;}
+.login-bg-glow{position:absolute;left:-10%;bottom:-15%;width:60%;height:70%;border-radius:50%;background:radial-gradient(ellipse,rgba(240,165,0,.20),transparent 70%);pointer-events:none;animation:loginGlow 12s ease-in-out infinite;}
+@keyframes loginGlow{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(4%,-3%) scale(1.08)}}
+.login-leaves{position:absolute;inset:0;pointer-events:none;opacity:.14;}
+.login-leaves svg{position:absolute;animation:leafDrift 22s ease-in-out infinite;}
+@keyframes leafDrift{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-14px) rotate(3deg)}}
+.login-box{background:#fff;border-radius:16px;padding:36px 32px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.35);position:relative;z-index:1;}
 .login-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px;}
 .login-logo-icon{width:42px;height:42px;background:linear-gradient(135deg,#76c442,#4caf50);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;}
 .login-logo-text{font-size:20px;font-weight:800;color:#0d2e1a;letter-spacing:-.3px;}
@@ -39,13 +44,18 @@
   --mint:#a8d5b0;--mist:#e8f5eb;--fog:#f2faf4;--sun:#f0a500;
   --red:#d63031;--sky:#0984e3;--purple:#6c5ce7;--teal:#00b894;--amber:#e17055;
   --ink:#0d1f12;--ink2:#2d4a35;--ink3:#5a7a62;--ink4:#8aaa90;
-  --bg:#f4fbf5;--card:#fff;--border:#c8e6cc;
-  --shadow:0 2px 12px rgba(13,46,26,.08);--radius:12px;
+  --bg:#f7faf7;--card:#fff;--border:#e2ece3;
+  --shadow:0 2px 12px rgba(13,46,26,.06);--radius:12px;
+  /* paleta tonal: un verde protagonista + un acento cálido con propósito (gastos/alertas) */
+  --tone-1:#1a5c2e;--tone-2:#5fa876;--tone-3:#c7d4c8;
+  --terracota:#c1603f;
   --c-anyelo:#6c5ce7;--c-jonathan:#f0a500;--c-kenny:#00b894;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--ink);min-height:100vh;}
-nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-height:54px;gap:2px;position:sticky;top:0;z-index:300;border-bottom:2px solid var(--leaf);flex-wrap:nowrap;}
+nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-height:54px;gap:2px;position:sticky;top:0;z-index:300;border-bottom:2px solid var(--leaf);flex-wrap:nowrap;position:relative;overflow:hidden;}
+nav::before{content:'';position:absolute;top:-30%;right:-4%;width:220px;height:180%;pointer-events:none;opacity:.10;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 140'%3E%3Cpath d='M10 130 Q50 20 130 30 Q90 55 75 130' fill='none' stroke='%23ffffff' stroke-width='4'/%3E%3Cpath d='M60 135 Q100 45 175 38 Q130 65 118 135' fill='none' stroke='%23ffffff' stroke-width='4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-size:contain;}
+nav>*{position:relative;z-index:1;}
 .nav-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--lime2),var(--lime));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-right:10px;flex-shrink:0;}
 .nav-brand{font-weight:800;font-size:16px;color:#fff;letter-spacing:-.3px;margin-right:20px;flex-shrink:0;}
 .nav-brand span{color:var(--lime2);}
@@ -303,10 +313,16 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
 
 <!-- ══ LOGIN ══ -->
 <div id="login-screen">
+  <div class="login-bg-glow"></div>
+  <div class="login-leaves">
+    <svg width="180" height="120" viewBox="0 0 180 120" style="top:8%;left:6%;animation-delay:0s"><path d="M10 100 Q40 20 100 25 Q65 50 55 100" fill="none" stroke="#fff" stroke-width="4"/></svg>
+    <svg width="160" height="110" viewBox="0 0 160 110" style="bottom:10%;right:8%;animation-delay:-6s"><path d="M8 95 Q45 15 120 22 Q75 48 60 95" fill="none" stroke="#76c442" stroke-width="4"/></svg>
+    <svg width="140" height="100" viewBox="0 0 140 100" style="top:55%;left:2%;animation-delay:-12s"><path d="M6 88 Q35 12 100 18 Q62 42 50 88" fill="none" stroke="#fff" stroke-width="3"/></svg>
+  </div>
   <div class="login-box">
     <div class="login-logo">
       <div class="login-logo-icon">🍍</div>
-      <div class="login-logo-text">Finca <span>BizOS</span></div>
+      <div class="login-logo-text">Costa <span>Piña</span></div>
     </div>
     <div class="login-title">Seleccioná tu usuario</div>
     <div class="login-sub">Cada usuario ve la información que le corresponde.</div>
@@ -344,7 +360,7 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
 
 <nav>
   <div class="nav-icon">🍍</div>
-  <div class="nav-brand">Finca <span>BizOS</span></div>
+  <div class="nav-brand">Costa <span>Piña</span></div>
   <div class="nav-spacer nav-spacer-mobile-only"></div>
   <button class="nav-burger" id="nav-burger" onclick="toggleNavMenu()" aria-label="Menú">☰</button>
   <div class="nav-menu" id="nav-menu">
@@ -530,6 +546,10 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
   <div class="field" style="max-width:300px;margin-bottom:16px">
     <label>Proyecto</label>
     <select id="fin-proj-sel" class="fi" onchange="renderFin()"></select>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Ingresos vs gastos por mes</div><div class="ctag" id="fin-flujo-tag">últimos 6 meses</div></div>
+    <div class="cb" id="fin-flujo"></div>
   </div>
   <div class="card">
     <div class="ch"><div class="ct">Real vs presupuestado</div><div class="ctag" id="fin-tag">$0</div></div>
@@ -808,7 +828,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.02.4';
+var APP_VERSION='2026.07.02.5';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1251,6 +1271,27 @@ function guardarProyecto(){
 }
 
 // ── RENDER PORTAFOLIO ──
+var TONE_PALETTE=['#1a5c2e','#5fa876','#c7d4c8','#8aaa90'];
+// Donut SVG puro (sin librerías) para el reparto de ganancia entre socios de un proyecto.
+function svgDonutSocios(socios,ganN){
+  var total=socios.reduce(function(s,x){return s+(parseFloat(x.pctGanancia)||0);},0)||1;
+  var r=60,cx=80,cy=80,circ=2*Math.PI*r,offset=0,segs='';
+  socios.forEach(function(s,si){
+    var frac=(parseFloat(s.pctGanancia)||0)/total;
+    var col=TONE_PALETTE[si%TONE_PALETTE.length];
+    var len=frac*circ;
+    segs+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+col+'" stroke-width="20" '+
+      'stroke-dasharray="'+len+' '+circ+'" stroke-dashoffset="'+(-offset)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';
+    offset+=len;
+  });
+  return '<div style="display:flex;align-items:center;justify-content:center;margin-bottom:6px">'+
+    '<svg viewBox="0 0 160 160" style="width:120px;height:120px;flex-shrink:0">'+
+    '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="var(--fog)" stroke-width="20"/>'+
+    segs+
+    '<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" font-size="15" font-weight="800" fill="var(--ink)" font-family="Plus Jakarta Sans,sans-serif">$'+Math.round(ganN).toLocaleString('es-CR')+'</text>'+
+    '<text x="'+cx+'" y="'+(cy+12)+'" text-anchor="middle" font-size="8.5" fill="var(--ink4)" font-family="Plus Jakarta Sans,sans-serif">proyectado</text>'+
+    '</svg></div>';
+}
 function renderPortafolio(){
   var totalHa=APP.proyectos.reduce(function(s,p){return s+p.ha;},0);
   var totalInv=APP.proyectos.reduce(function(s,p){return s+p.inv;},0);
@@ -1349,9 +1390,10 @@ function renderPortafolio(){
     // Distribución socios
     h+='<div class="g2" style="margin-top:14px">';
     h+='<div class="card" style="margin-bottom:0"><div class="ch"><div class="ct">Distribución ganancia</div><div class="ctag '+(esReal?'badge-real':'badge-proy')+'" id="dist-tag-'+p.id+'">'+(esReal?'real':'proyectado')+'</div></div><div class="cb" id="dist-'+p.id+'">';
-    p.socios.forEach(function(s){
+    h+=svgDonutSocios(p.socios,ganN);
+    p.socios.forEach(function(s,si){
       var m=Math.max(0,ganN*(s.pctGanancia/100));
-      var col=s.color||stringToColor(s.nombre);
+      var col=TONE_PALETTE[si%TONE_PALETTE.length];
       h+='<div class="dist-row">';
       h+='<div class="avatar" style="background:'+col+'">'+initials(s.nombre)+'</div>';
       h+='<div class="di"><div class="dn">'+s.nombre+'</div><div class="dp">'+s.pctGanancia+'% ganancia'+(s.aporte>0?' · aportó $'+s.aporte.toLocaleString('es-CR'):'')+'</div></div>';
@@ -1566,8 +1608,46 @@ function renderKPIs(){
   document.getElementById('m-i').textContent='$'+ti.toLocaleString('es-CR',{minimumFractionDigits:0});
 }
 
+// Gráfica de barras SVG: ingresos (verde) vs gastos (terracota) de los últimos 6 meses.
+function svgFlujoMensual(fp){
+  var MESES_CORTO=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'];
+  var hoy=new Date(),meses=[];
+  for(var i=5;i>=0;i--){meses.push(new Date(hoy.getFullYear(),hoy.getMonth()-i,1));}
+  var datos=meses.map(function(m){
+    var ing=0,gas=0;
+    APP.tx.forEach(function(t){
+      if(fp&&String(t.projId)!==fp)return;
+      var tf=new Date(t.fecha);
+      if(tf.getFullYear()===m.getFullYear()&&tf.getMonth()===m.getMonth()){
+        if(t.tipo==='Ingreso')ing+=parseFloat(t.monto)||0;
+        if(t.tipo==='Gasto')gas+=parseFloat(t.monto)||0;
+      }
+    });
+    return {mes:m,ing:ing,gas:gas};
+  });
+  var max=Math.max.apply(null,datos.map(function(d){return Math.max(d.ing,d.gas);}).concat([1]));
+  var wStep=560/datos.length,barW=16,plotH=120,baseY=140;
+  var bars='';
+  datos.forEach(function(d,i){
+    var x=i*wStep+wStep/2-barW-2;
+    var hIng=max>0?(d.ing/max)*plotH:0,hGas=max>0?(d.gas/max)*plotH:0;
+    bars+='<rect x="'+x+'" y="'+(baseY-hIng)+'" width="'+barW+'" height="'+hIng+'" rx="3" fill="var(--leaf2)"/>';
+    bars+='<rect x="'+(x+barW+2)+'" y="'+(baseY-hGas)+'" width="'+barW+'" height="'+hGas+'" rx="3" fill="var(--terracota)"/>';
+    bars+='<text x="'+(x+barW+1)+'" y="'+(baseY+14)+'" font-size="10" fill="var(--ink4)" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif">'+MESES_CORTO[d.mes.getMonth()]+'</text>';
+  });
+  var totIng=datos.reduce(function(s,d){return s+d.ing;},0);
+  return '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'+
+    '<div><div style="font-size:20px;font-weight:800;color:var(--ink)">$'+Math.round(totIng).toLocaleString('es-CR')+'</div><div style="font-size:11px;color:var(--ink4)">ingresos acumulados · 6 meses</div></div>'+
+    '<div style="display:flex;gap:12px;font-size:10.5px">'+
+    '<span style="display:flex;align-items:center;gap:5px;color:var(--ink3)"><span style="width:8px;height:8px;border-radius:50%;background:var(--leaf2);display:inline-block"></span>Ingresos</span>'+
+    '<span style="display:flex;align-items:center;gap:5px;color:var(--ink3)"><span style="width:8px;height:8px;border-radius:50%;background:var(--terracota);display:inline-block"></span>Gastos</span></div></div>'+
+    '<svg viewBox="0 0 560 165" style="width:100%;height:150px">'+
+    '<line x1="10" y1="140" x2="550" y2="140" stroke="var(--border)" stroke-width="1"/>'+
+    bars+'</svg>';
+}
 function renderFin(){
   var fp=document.getElementById('fin-proj-sel').value;
+  document.getElementById('fin-flujo').innerHTML=svgFlujoMensual(fp);
   var proj=fp?APP.proyectos.find(function(p){return String(p.id)===fp;}):APP.proyectos[0];
   if(!proj){document.getElementById('fin-bars').innerHTML='<p style="color:var(--ink4)">Seleccioná un proyecto.</p>';return;}
   if(!proj.presupuesto)proj.presupuesto=JSON.parse(JSON.stringify(PRESUP_DEFAULT));
@@ -1580,7 +1660,7 @@ function renderFin(){
   Object.keys(presup).forEach(function(cat){
     var real=cats[cat]||0;var pres=presup[cat];
     var pct=pres>0?Math.min(Math.round((real/pres)*100),130):0;
-    var col=pct>100?'var(--red)':pct>70?'var(--sun)':'var(--leaf2)';
+    var col=pct>=85?'var(--terracota)':'var(--leaf2)';
     h+='<div style="margin-bottom:15px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">';
     h+='<span style="font-size:12px;font-weight:600;color:var(--ink2)">'+cat+'</span>';
     h+='<span style="font-size:11px;font-family:JetBrains Mono,monospace;color:var(--ink3);display:flex;align-items:center;gap:4px">$'+real.toLocaleString('es-CR')+' / $'+
@@ -2298,7 +2378,7 @@ function renderPFResumen(){
     var pres=toUSD(cat.presupuesto,cat.moneda),gast=gbc[cat.id]||0;
     totP+=pres;totG+=gast;
     var pct=pres>0?Math.min(Math.round((gast/pres)*100),130):0;
-    var bc=pct>100?'var(--red)':pct>80?'var(--sun)':'var(--leaf2)';
+    var bc=pct>=85?'var(--terracota)':'var(--leaf2)';
     var tbadge=cat.tipo==='esencial'?'<span class="tipo-esencial">Esencial</span>':cat.tipo==='no_esencial'?'<span class="tipo-no_esencial">No esencial</span>':'<span class="tipo-variable">Variable</span>';
     h+='<div style="margin-bottom:13px">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'+
@@ -2315,7 +2395,7 @@ function renderPFResumen(){
   var ptot=totP>0?Math.round((totG/totP)*100):0;
   h+='<div style="border-top:2px solid var(--border);padding-top:10px;display:flex;justify-content:space-between">'+
     '<span style="font-size:12px;font-weight:700;color:var(--ink2)">TOTAL</span>'+
-    '<span style="font-size:14px;font-family:JetBrains Mono,monospace;font-weight:800;color:'+(ptot>100?'var(--red)':'var(--leaf)')+'">$'+Math.round(totG)+' / $'+Math.round(totP)+' ('+ptot+'%)</span>'+
+    '<span style="font-size:14px;font-family:JetBrains Mono,monospace;font-weight:800;color:'+(ptot>=85?'var(--terracota)':'var(--leaf)')+'">$'+Math.round(totG)+' / $'+Math.round(totP)+' ('+ptot+'%)</span>'+
   '</div></div></div>';
   var rec=(p.gastosPersonales||[]).filter(function(g){return g.fecha.startsWith(mes);}).slice().sort(function(a,b){return b.fecha.localeCompare(a.fecha);}).slice(0,8);
   if(rec.length>0){
