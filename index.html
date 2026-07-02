@@ -443,13 +443,13 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
 
 <!-- ══ MI VISTA ══ -->
 <div class="page" id="p-mivista">
-  <div class="ph"><div><div class="pt">Mi Vista</div><div class="ps">Retornos esperados y reales · solo para el administrador</div></div></div>
+  <div class="ph"><div><div class="pt">Mi Vista</div><div class="ps">Tu participación, retornos esperados y reales — información personal, no la ve el otro usuario</div></div></div>
 
   <div class="mv-hero">
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div>
         <div class="mv-nombre">👤 Mi Vista</div>
-        <div class="mv-sub">Socio administrador</div>
+        <div class="mv-sub" id="mv-sub">Socio administrador</div>
       </div>
       <div style="text-align:right;flex-shrink:0;margin-left:16px">
         <div style="font-size:10px;opacity:.4;text-transform:uppercase;letter-spacing:1px">Salario externo</div>
@@ -808,7 +808,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.02.2';
+var APP_VERSION='2026.07.02.3';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -896,12 +896,23 @@ function doLogout(){
   document.getElementById('login-screen').style.display='flex';
 }
 
+// Encuentra, dentro de la lista de socios de un proyecto, al que corresponde
+// al usuario CONECTADO en este momento (no siempre "Anyelo"). Así Portafolio,
+// Mi Vista y el calendario de ingresos muestran la parte de quien esté
+// usando el dashboard — Anyelo ve la suya, Jonathan ve la suya.
+function socioUsuarioActual(socios){
+  if(!usuarioActual||!socios)return null;
+  var clave=usuarioActual.id; // 'anyelo' o 'jonathan'
+  return socios.find(function(x){return (x.nombre||'').toLowerCase().includes(clave);})||null;
+}
+
 function aplicarRol(){
   var u=usuarioActual;
   document.getElementById('nav-usuario').textContent='👤 '+u.nombre;
-  // Jonathan solo ve Portafolio, Movimientos y Finanzas
+  // Jonathan ve Mi Vista también (es SU participación en los proyectos, no
+  // datos ajenos). Solo "Mis Finanzas" (presupuesto/salario personal de
+  // Anyelo) queda exclusivo del admin.
   var soloEmpresa=u.rol==='campo';
-  document.getElementById('tab-mivista').style.display=soloEmpresa?'none':'';
   document.getElementById('tab-misfinanzas').style.display=soloEmpresa?'none':'';
   mostrarBienvenidaSiCorresponde();
   // Ir siempre a Portafolio al entrar
@@ -1169,6 +1180,41 @@ function abrirNuevoProyecto(){
   document.getElementById('modal-proj').classList.add('open');
 }
 
+// Eliminar un proyecto entero. Los movimientos asociados NO se pierden — se
+// mueven a la Papelera (igual que un borrado normal), con registro de quién
+// y cuándo, y se pueden restaurar. Igual que guardarProyecto(), primero
+// refresca desde Sheets para no pisar un proyecto que el otro usuario haya
+// creado o editado mientras tanto.
+function eliminarProyecto(pid){
+  var p=APP.proyectos.find(function(x){return x.id===pid;});
+  if(!p)return;
+  var txAsociadas=APP.tx.filter(function(t){return t.projId===pid;});
+  var msg='¿Eliminar el proyecto "'+p.nombre+'"?';
+  if(txAsociadas.length)msg+='\n\nTiene '+txAsociadas.length+' movimiento(s) asociado(s) — se moverán junto con el proyecto a la Papelera de Movimientos (se pueden restaurar).';
+  msg+='\n\nEsto se sincroniza con Google Sheets.';
+  if(!confirm(msg))return;
+  var quien=usuarioActual?usuarioActual.nombre:'';
+  toast('⏳ Eliminando proyecto…');
+  cargarDesdeSheets(function(){
+    // Volver a ubicar el proyecto y sus tx en la copia fresca (por si cambiaron)
+    var pFresco=APP.proyectos.find(function(x){return x.id===pid;});
+    if(!pFresco){toast('⚠ Ese proyecto ya no existe en Sheets',true);renderPortafolio();return;}
+    var txFrescas=APP.tx.filter(function(t){return t.projId===pid;});
+    txFrescas.forEach(function(t){
+      t.eliminadoPor=quien;t.eliminadoEn=new Date().toISOString();
+      if(!APP.papelera)APP.papelera=[];
+      APP.papelera.unshift(t);
+      fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({key:API_KEY,accion:'marcar_eliminado',hoja:'Transacciones',id:t.id,usuario:quien})}).catch(function(){});
+    });
+    APP.tx=APP.tx.filter(function(t){return t.projId!==pid;});
+    APP.proyectos=APP.proyectos.filter(function(x){return x.id!==pid;});
+    saveL();
+    renderPortafolio();
+    syncProyectosASheet();
+  });
+}
+
 function guardarProyecto(){
   var nombre=document.getElementById('np-nombre').value.trim();
   var ha=parseFloat(document.getElementById('np-ha').value)||1.5;
@@ -1210,8 +1256,8 @@ function renderPortafolio(){
   var totalInv=APP.proyectos.reduce(function(s,p){return s+p.inv;},0);
   var totalGanProy=APP.proyectos.reduce(function(s,p){return s+calcGanancia(p);},0);
   var tuParteTotal=APP.proyectos.reduce(function(s,p){
-    var anyelo=p.socios.find(function(x){return x.nombre.toLowerCase().includes('anyelo');});
-    return s+(anyelo?Math.max(0,calcGanancia(p)*(anyelo.pctGanancia/100)):0);
+    var mio=socioUsuarioActual(p.socios);
+    return s+(mio?Math.max(0,calcGanancia(p)*(mio.pctGanancia/100)):0);
   },0);
   document.getElementById('emp-stats').innerHTML=
     '<div><div class="esv">'+APP.proyectos.length+'</div><div class="esl">Proyectos</div></div>'+
@@ -1232,8 +1278,8 @@ function renderPortafolio(){
   var h='';
   APP.proyectos.forEach(function(p){
     var gan=calcGanancia(p);
-    var anyelo=p.socios.find(function(x){return x.nombre.toLowerCase().includes('anyelo');});
-    var tuParte=anyelo?Math.max(0,gan*(anyelo.pctGanancia/100)):0;
+    var mio=socioUsuarioActual(p.socios);
+    var tuParte=mio?Math.max(0,gan*(mio.pctGanancia/100)):0;
     var gastoReal=APP.tx.filter(function(t){return t.projId===p.id&&t.tipo==='Gasto';}).reduce(function(s,t){return s+parseFloat(t.monto);},0);
     var ejec=p.inv>0?Math.round((gastoReal/p.inv)*100):0;
     var ingReal=APP.tx.filter(function(t){return t.projId===p.id&&t.tipo==='Ingreso';}).reduce(function(s,t){return s+parseFloat(t.monto);},0);
@@ -1246,11 +1292,12 @@ function renderPortafolio(){
     h+='<div class="proj-actions">';
     h+='<span class="act-badge '+(p.activo?'badge-activo':'badge-planeado')+'">'+(p.activo?p.ciclo+' · Activo':'Planeado')+'</span>';
     h+='<button onclick="editarProyecto('+p.id+')" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">✎ Editar</button>';
+    h+='<button onclick="eliminarProyecto('+p.id+')" title="Eliminar proyecto" style="background:rgba(214,48,49,.25);border:1px solid rgba(255,255,255,.3);color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">🗑</button>';
     h+='</div></div>';
 
     h+='<div style="padding:16px">';
     h+='<div class="g4">';
-    h+='<div class="kpi g"><div class="kl">Inversión</div><div class="kv">$'+p.inv.toLocaleString('es-CR',{minimumFractionDigits:0})+'</div><div class="ks">presupuestado</div></div>';
+    h+='<div class="kpi g"><div class="kl">Inversión</div><div class="kv">$'+p.inv.toLocaleString('es-CR',{minimumFractionDigits:0})+'</div><div class="ks">'+(p.inv===0?'<span style="color:var(--red)">⚠ sin inversión registrada</span>':'presupuestado')+'</div></div>';
     h+='<div class="kpi s"><div class="kl">Ingreso bruto proy.</div><div class="kv">$'+Math.round(calcIngreso(p)).toLocaleString('es-CR')+'</div><div class="ks"><span class="'+(esReal?'badge-real':'badge-proy')+'">'+(esReal?'real':'proyectado')+'</span></div></div>';
     h+='<div class="kpi g"><div class="kl">Ganancia proy.</div><div class="kv">$'+Math.round(gan).toLocaleString('es-CR')+'</div><div class="ks"><span class="'+(esReal?'badge-real':'badge-proy')+'">'+(esReal?'real':'proyectado')+'</span></div></div>';
     h+='<div class="kpi p"><div class="kl">Tu parte</div><div class="kv">$'+Math.round(tuParte).toLocaleString('es-CR')+'</div><div class="ks"><span class="'+(esReal?'badge-real':'badge-proy')+'">'+(esReal?'real':'proyectado')+'</span></div></div>';
@@ -1600,13 +1647,22 @@ function guardar(){
 
 // ── MI VISTA ──
 function renderMiVista(){
-  initPersonal();
-  var sbMV=APP.personal.salarioBruto||0;
+  // "Mi Vista" es personal: cada usuario ve SU participación, no la del otro.
+  var elSub=document.getElementById('mv-sub');
+  if(elSub&&usuarioActual)elSub.textContent=usuarioActual.rol==='admin'?'Socio administrador':'Socio · Operación de campo';
+  // El salario/independencia financiera es un dato de Mis Finanzas (solo
+  // Anyelo tiene esa pestaña) — para Jonathan no aplica, se oculta.
   var elMV=document.getElementById('mv-salario');
-  if(elMV)elMV.textContent=sbMV>0?'$'+sbMV.toLocaleString('es-CR')+'/mes':'—';
-  var ANYELO_KEY='anyelo';
+  var elMVWrap=elMV?elMV.closest('div[style*="text-align:right"]'):null;
+  var esAdmin=usuarioActual&&usuarioActual.rol==='admin';
+  if(elMVWrap)elMVWrap.style.display=esAdmin?'':'none';
+  if(esAdmin&&elMV){
+    initPersonal();
+    var sbMV=APP.personal.salarioBruto||0;
+    elMV.textContent=sbMV>0?'$'+sbMV.toLocaleString('es-CR')+'/mes':'—';
+  }
   var proyAnye=APP.proyectos.map(function(p){
-    var s=p.socios.find(function(x){return x.nombre.toLowerCase().includes('anyelo');});
+    var s=socioUsuarioActual(p.socios);
     if(!s)return null;
     return {proj:p,socio:s};
   }).filter(Boolean);
@@ -1790,7 +1846,7 @@ function calcFechaCosechaEstimada(p){
   return d;
 }
 
-// ── CALENDARIO DE INGRESOS PERSONALES (solo Anyelo) ──
+// ── CALENDARIO DE INGRESOS PERSONALES (Anyelo o Jonathan, según quién entró) ──
 // Muestra, mes a mes, cuándo se estima que "cae" la ganancia de cada
 // proyecto (la piña se paga el mismo día/al día siguiente de cosechar, así
 // que es un solo pago grande en el mes de cosecha, no un flujo repartido).
