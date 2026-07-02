@@ -779,7 +779,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.01.2';
+var APP_VERSION='2026.07.01.3';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -901,7 +901,7 @@ function mostrarBienvenidaSiCorresponde(){
   ];
   card.className='bienvenida';
   card.innerHTML='<button class="bienvenida-close" onclick="cerrarBienvenida()" title="No mostrar de nuevo">✕</button>'+
-    '<div class="bienvenida-title">👋 Hola, '+u.nombre+' — algunas cositas útiles:</div>'+
+    '<div class="bienvenida-title">👋 Hola, '+u.nombre+' — antes de empezar, esto te puede servir:</div>'+
     '<ul>'+tips.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul>';
   card.style.display='block';
 }
