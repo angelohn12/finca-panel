@@ -147,6 +147,18 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
 .dms{font-size:10px;color:var(--ink4);}
 .sim-box{background:var(--mist);border:1px solid var(--mint);border-radius:10px;padding:14px;margin-bottom:14px;}
 
+/* TARJETA DE BIENVENIDA — sutil, no bloquea nada, se descarta para siempre */
+.bienvenida{background:linear-gradient(135deg,var(--mist),var(--fog));border:1px solid var(--mint);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px;position:relative;}
+.bienvenida-close{position:absolute;top:10px;right:10px;background:none;border:none;font-size:15px;cursor:pointer;color:var(--ink4);padding:4px 8px;border-radius:6px;}
+.bienvenida-close:hover{background:rgba(0,0,0,.06);color:var(--ink2);}
+.bienvenida-title{font-size:13px;font-weight:800;color:var(--forest);margin-bottom:8px;padding-right:24px;}
+.bienvenida ul{margin:0;padding-left:18px;}
+.bienvenida li{font-size:12px;color:var(--ink2);margin-bottom:4px;line-height:1.5;}
+.bienvenida li:last-child{margin-bottom:0;}
+
+/* Ícono de ayuda "?" — solo en botones donde el nombre no explica la acción */
+.help-tip{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:rgba(255,255,255,.2);color:inherit;font-size:10px;font-weight:800;cursor:help;margin-left:4px;flex-shrink:0;}
+
 /* PROYECTO CARD */
 .proj-wrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;background:var(--card);}
 .proj-hd{padding:14px 18px;display:flex;justify-content:space-between;align-items:center;color:#fff;}
@@ -343,7 +355,7 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
     <button class="nav-tab" id="tab-misfinanzas" onclick="pg('misfinanzas',this)">💸 Mis Finanzas</button>
     <div class="nav-spacer"></div>
     <span id="nav-usuario" style="font-size:11px;color:rgba(255,255,255,.5);margin-right:10px;font-weight:600"></span>
-    <button onclick="sincronizarTodo()" class="nav-sync-btn" style="background:rgba(118,196,66,.15);border:1px solid rgba(118,196,66,.3);color:var(--lime2);padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:Plus Jakarta Sans,sans-serif;margin-right:8px">🔄 Sync Sheets</button>
+    <button onclick="sincronizarTodo()" class="nav-sync-btn" title="Empuja al instante cualquier cambio pendiente hacia Google Sheets. Normalmente no hace falta tocarlo — es automático." style="background:rgba(118,196,66,.15);border:1px solid rgba(118,196,66,.3);color:var(--lime2);padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:Plus Jakarta Sans,sans-serif;margin-right:8px">🔄 Sync Sheets</button>
     <div class="pulse-wrap" id="pulse-wrap" title="Estado de conexión con Google Sheets"><div class="pulse-dot" id="pulse-dot"></div><span id="slbl">Conectando…</span></div>
     <span id="app-version" style="font-size:9px;color:rgba(255,255,255,.3);font-family:'JetBrains Mono',monospace;margin-left:8px"></span>
     <button class="logout-btn" onclick="doLogout()" style="margin-left:10px">↩ Salir</button>
@@ -352,6 +364,7 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
 
 <!-- ══ PORTAFOLIO ══ -->
 <div class="page active" id="p-portafolio">
+  <div id="bienvenida-card" style="display:none"></div>
   <div class="ph">
     <div><div class="pt">Mi Portafolio</div><div class="ps">Estructura societaria · proyectos activos · distribución de utilidades</div></div>
     <button class="btn btn-primary" onclick="abrirNuevoProyecto()">+ Nuevo proyecto</button>
@@ -468,7 +481,7 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
   <div class="ph">
     <div><div class="pt">Movimientos</div><div class="ps">Registro de ingresos y gastos · sincronizado con Google Sheets</div></div>
     <div style="display:flex;gap:8px">
-      <button class="btn btn-ghost" onclick="abrirPapelera()">🗑 Papelera</button>
+      <button class="btn btn-ghost" onclick="abrirPapelera()" title="Los movimientos borrados quedan acá guardados y se pueden recuperar en cualquier momento.">🗑 Papelera</button>
       <button class="btn btn-primary" onclick="document.getElementById('modal-mov').classList.add('open')">+ Nuevo movimiento</button>
     </div>
   </div>
@@ -766,7 +779,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.01.1';
+var APP_VERSION='2026.07.01.2';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -861,8 +874,42 @@ function aplicarRol(){
   var soloEmpresa=u.rol==='campo';
   document.getElementById('tab-mivista').style.display=soloEmpresa?'none':'';
   document.getElementById('tab-misfinanzas').style.display=soloEmpresa?'none':'';
+  mostrarBienvenidaSiCorresponde();
   // Ir siempre a Portafolio al entrar
   pg('portafolio',document.getElementById('tab-portafolio'));
+}
+
+// ── BIENVENIDA SUTIL (una sola vez por usuario, nunca bloquea nada) ──
+// Se guarda en localStorage por usuario (id) — así Anyelo y Jonathan cada
+// uno la ve una vez, sin importar cuántas veces entre el otro.
+function mostrarBienvenidaSiCorresponde(){
+  var u=usuarioActual;if(!u)return;
+  var clave='jorisu_bienvenida_vista_'+u.id;
+  var card=document.getElementById('bienvenida-card');
+  if(!card)return;
+  try{if(localStorage.getItem(clave)){card.style.display='none';return;}}catch(e){}
+  var tips=(u.rol==='campo')?[
+    'Elegí tu nombre y contraseña cada vez que entrés — así el dashboard sabe qué mostrarte.',
+    '"Portafolio" muestra los proyectos y socios. "Movimientos" es donde registrás gastos e ingresos.',
+    'Tocá "+ Nuevo movimiento" para anotar un gasto o cosecha — se guarda directo en el sistema, sin papel.',
+    'Si te equivocás al borrar algo, andá a "🗑 Papelera" en Movimientos para recuperarlo.'
+  ]:[
+    'Lo que registrés vos o Jonathan aparece del otro lado al recargar la página.',
+    '"Mi Vista" y "Mis Finanzas" son privadas — Jonathan no las ve.',
+    'El punto verde arriba a la derecha te dice si estás conectado a Google Sheets en tiempo real.',
+    'Si algo se borra por error, "🗑 Papelera" (en Movimientos) lo puede recuperar.'
+  ];
+  card.className='bienvenida';
+  card.innerHTML='<button class="bienvenida-close" onclick="cerrarBienvenida()" title="No mostrar de nuevo">✕</button>'+
+    '<div class="bienvenida-title">👋 Hola, '+u.nombre+' — algunas cositas útiles:</div>'+
+    '<ul>'+tips.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul>';
+  card.style.display='block';
+}
+function cerrarBienvenida(){
+  var u=usuarioActual;if(!u)return;
+  try{localStorage.setItem('jorisu_bienvenida_vista_'+u.id,'1');}catch(e){}
+  var card=document.getElementById('bienvenida-card');
+  if(card)card.style.display='none';
 }
 
 // Restaurar sesión si ya estaba logueado (recarga de página)
