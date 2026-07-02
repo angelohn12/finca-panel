@@ -474,6 +474,18 @@ nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-
     <div class="ch"><div class="ct">Modelo de independencia financiera</div><div class="ctag badge-proy">proyectado</div></div>
     <div class="cb" id="mv-cruce"></div>
   </div>
+
+  <div class="sec">📅 Calendario de mis ingresos · cuándo cae la plata</div>
+  <div class="card">
+    <div class="ch"><div class="ct">Tu parte, mes a mes (según fecha estimada de cosecha)</div><div class="ctag badge-proy">estimado</div></div>
+    <div class="cb" id="mv-calendario"></div>
+  </div>
+
+  <div class="sec">Ingresos anuales estimados</div>
+  <div class="card">
+    <div class="ch"><div class="ct">Total de tu parte por año calendario</div><div class="ctag badge-proy">estimado</div></div>
+    <div class="cb" id="mv-anual"></div>
+  </div>
 </div>
 
 <!-- ══ MOVIMIENTOS ══ -->
@@ -796,7 +808,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.02.1';
+var APP_VERSION='2026.07.02.2';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1344,7 +1356,11 @@ function editarProyecto(pid){
   document.getElementById('np-plantas').value=p.plantas||65000;
   document.getElementById('np-inv').value=p.inv;
   document.getElementById('np-ciclo').value=p.ciclo||'PC';
-  document.getElementById('np-siembra').value=p.siembra||'';
+  // El input type="month" solo entiende "YYYY-MM". Google Sheets guarda las
+  // fechas como texto ISO completo (ej: "2026-04-01T06:00:00.000Z") — si se
+  // le pasa tal cual, el input la rechaza en silencio y queda vacía. Por eso
+  // se recorta a los primeros 7 caracteres (YYYY-MM) antes de asignarla.
+  document.getElementById('np-siembra').value=(p.siembra||'').slice(0,7);
   colorSeleccionado=p.color||COLORES[0];
   buildColorPick();
   document.getElementById('socios-rows').innerHTML='';
@@ -1721,10 +1737,19 @@ function renderMiVista(){
 
   // Punto de cruce
   renderCruce(proyAnye);
+
+  // Calendario de ingresos personales
+  renderCalendarioIngresos(proyAnye);
 }
 
+// Duración del ciclo (siembra → cosecha) en meses, con semilla corona.
+// PC: dato real de Jonathan — forzamiento al mes 10 + ~5 meses = cosecha ~mes 15.
+// SC/TC (segunda/tercera cosecha, retoño de la misma planta): estimado, más
+// corto que la primera — ajustable cuando haya dato de campo medido.
+var DURACION_CICLO_MESES={PC:15,SC:11,TC:11,Otro:14};
+
 function buildMiniTimeline(p){
-  var totalMeses=p.ciclo==='SC'?10:14;
+  var totalMeses=DURACION_CICLO_MESES[p.ciclo]||14;
   var mesesPasados=calcMesesDesde(p.siembra);
   var h='<div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden">';
   for(var i=1;i<=totalMeses;i++){
@@ -1748,9 +1773,94 @@ function calcMesesDesde(siembra){
 }
 
 function calcMesesACosecha(p){
-  var totalMeses=p.ciclo==='SC'?10:14;
+  var totalMeses=DURACION_CICLO_MESES[p.ciclo]||14;
   var pasados=calcMesesDesde(p.siembra);
   return Math.max(0,totalMeses-pasados+1);
+}
+
+// Fecha estimada de cosecha = fecha de siembra + duración del ciclo.
+// Devuelve null si el proyecto no tiene fecha de siembra registrada.
+function calcFechaCosechaEstimada(p){
+  if(!p.siembra)return null;
+  var partes=p.siembra.split('-');
+  var y=parseInt(partes[0]),m=parseInt(partes[1]);
+  if(isNaN(y)||isNaN(m))return null;
+  var totalMeses=DURACION_CICLO_MESES[p.ciclo]||14;
+  var d=new Date(y,m-1+totalMeses,1);
+  return d;
+}
+
+// ── CALENDARIO DE INGRESOS PERSONALES (solo Anyelo) ──
+// Muestra, mes a mes, cuándo se estima que "cae" la ganancia de cada
+// proyecto (la piña se paga el mismo día/al día siguiente de cosechar, así
+// que es un solo pago grande en el mes de cosecha, no un flujo repartido).
+function renderCalendarioIngresos(proyAnye){
+  var elCal=document.getElementById('mv-calendario');
+  var elAnual=document.getElementById('mv-anual');
+  if(!elCal||!elAnual)return;
+
+  var eventos=proyAnye.map(function(x){
+    var fecha=calcFechaCosechaEstimada(x.proj);
+    var tuParte=Math.max(0,calcGanancia(x.proj)*(x.socio.pctGanancia/100));
+    return {nombre:x.proj.nombre,fecha:fecha,monto:tuParte};
+  }).filter(function(e){return e.fecha&&e.monto>0;})
+    .sort(function(a,b){return a.fecha-b.fecha;});
+
+  if(!eventos.length){
+    elCal.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">Agregá fecha de siembra a tus proyectos para ver cuándo cae tu ganancia estimada.</div>';
+    elAnual.innerHTML='';
+    return;
+  }
+
+  // Timeline mes a mes, desde el mes actual hasta el último evento
+  var hoy=new Date();var inicio=new Date(hoy.getFullYear(),hoy.getMonth(),1);
+  var fin=eventos[eventos.length-1].fecha;
+  var meses=(fin.getFullYear()-inicio.getFullYear())*12+(fin.getMonth()-inicio.getMonth())+1;
+  meses=Math.max(meses,1);
+  var maxMonto=Math.max.apply(null,eventos.map(function(e){return e.monto;}));
+  var NOMBRES_MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'];
+
+  var h='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px">';
+  for(var i=0;i<meses;i++){
+    var mFecha=new Date(inicio.getFullYear(),inicio.getMonth()+i,1);
+    var evsMes=eventos.filter(function(e){return e.fecha.getFullYear()===mFecha.getFullYear()&&e.fecha.getMonth()===mFecha.getMonth();});
+    var totalMes=evsMes.reduce(function(s,e){return s+e.monto;},0);
+    var alturaBarra=totalMes>0?Math.max(18,Math.round((totalMes/maxMonto)*70)):0;
+    h+='<div style="flex:0 0 62px;text-align:center">';
+    h+='<div style="height:74px;display:flex;align-items:flex-end;justify-content:center">';
+    if(totalMes>0){
+      h+='<div title="'+evsMes.map(function(e){return e.nombre+': $'+Math.round(e.monto).toLocaleString('es-CR');}).join(' · ')+'" style="width:28px;height:'+alturaBarra+'px;background:var(--c-anyelo);border-radius:4px 4px 0 0"></div>';
+    }
+    h+='</div>';
+    h+='<div style="font-size:9px;color:var(--ink4);margin-top:4px;font-weight:'+(totalMes>0?'700':'400')+';color:'+(totalMes>0?'var(--c-anyelo)':'var(--ink4)')+'">'+NOMBRES_MES[mFecha.getMonth()]+'<br>'+mFecha.getFullYear()+'</div>';
+    if(totalMes>0)h+='<div style="font-size:9px;font-weight:800;color:var(--c-anyelo);margin-top:2px">$'+Math.round(totalMes).toLocaleString('es-CR')+'</div>';
+    h+='</div>';
+  }
+  h+='</div>';
+  h+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">';
+  eventos.forEach(function(e){
+    h+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px">';
+    h+='<span style="color:var(--ink2)">'+e.nombre+' <span style="color:var(--ink4);font-size:10px">· '+NOMBRES_MES[e.fecha.getMonth()]+' '+e.fecha.getFullYear()+'</span></span>';
+    h+='<span style="font-weight:700;color:var(--c-anyelo);font-family:JetBrains Mono,monospace">$'+Math.round(e.monto).toLocaleString('es-CR')+'</span>';
+    h+='</div>';
+  });
+  h+='<div style="font-size:10px;color:var(--ink4);margin-top:8px">⚠ Fechas y montos estimados según el ciclo de siembra y el simulador — la piña se paga el mismo día o al día siguiente de cosechar, no en cuotas.</div>';
+  h+='</div>';
+  elCal.innerHTML=h;
+
+  // Resumen por año calendario
+  var porAnio={};
+  eventos.forEach(function(e){var y=e.fecha.getFullYear();porAnio[y]=(porAnio[y]||0)+e.monto;});
+  var anios=Object.keys(porAnio).sort();
+  var hA='<div style="display:grid;grid-template-columns:repeat('+Math.min(anios.length,4)+',1fr);gap:11px">';
+  anios.forEach(function(y){
+    hA+='<div style="background:var(--fog);border-radius:8px;padding:12px;text-align:center">';
+    hA+='<div style="font-size:20px;font-weight:800;color:var(--c-anyelo)">$'+Math.round(porAnio[y]).toLocaleString('es-CR')+'</div>';
+    hA+='<div style="font-size:11px;color:var(--ink4);margin-top:2px">'+y+'</div>';
+    hA+='</div>';
+  });
+  hA+='</div>';
+  elAnual.innerHTML=hA;
 }
 
 function renderCruce(proyAnye){
