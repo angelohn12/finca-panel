@@ -831,7 +831,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.02.6';
+var APP_VERSION='2026.07.03.1';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -938,9 +938,20 @@ function aplicarRol(){
   var soloEmpresa=u.rol==='campo';
   document.getElementById('tab-misfinanzas').style.display=soloEmpresa?'none':'';
   mostrarBienvenidaSiCorresponde();
-  // Ir siempre a Portafolio al entrar
-  pg('portafolio',document.getElementById('tab-portafolio'));
+  // Respeta la sección de la URL si es válida (deep link / recarga de página);
+  // si no hay hash o Jonathan no tiene acceso a esa pestaña, va a Portafolio.
+  var PESTANAS_VALIDAS=['portafolio','mivista','movimientos','finanzas','misfinanzas'];
+  var idInicial=window.location.hash.slice(1);
+  if(!PESTANAS_VALIDAS.includes(idInicial)||(soloEmpresa&&idInicial==='misfinanzas'))idInicial='portafolio';
+  pg(idInicial,document.getElementById('tab-'+idInicial));
 }
+
+// Botón "atrás"/"adelante" del navegador entre secciones (deep linking).
+window.addEventListener('popstate',function(){
+  var id=window.location.hash.slice(1)||'portafolio';
+  if(!usuarioActual)return; // aún no ha iniciado sesión
+  pg(id,document.getElementById('tab-'+id),true);
+});
 
 // ── BIENVENIDA SUTIL (una sola vez por usuario, nunca bloquea nada) ──
 // Se guarda en localStorage por usuario (id) — así Anyelo y Jonathan cada
@@ -1106,12 +1117,18 @@ function toggleNavMenu(){
   document.getElementById('nav-menu').classList.toggle('open');
 }
 
-function pg(id,btn){
+function pg(id,btn,skipHash){
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active');});
   document.getElementById('p-'+id).classList.add('active');
-  if(btn)btn.classList.add('active');
+  var botonTab=btn||document.getElementById('tab-'+id);
+  if(botonTab)botonTab.classList.add('active');
   document.getElementById('nav-menu').classList.remove('open'); // cerrar menú móvil al navegar
+  // Deep linking: la URL refleja la sección actual — permite compartir el link
+  // directo a una pestaña y usar el botón "atrás" del navegador entre secciones.
+  if(!skipHash && window.location.hash.slice(1)!==id){
+    history.pushState({pg:id},'','#'+id);
+  }
   function render(){
     if(id==='mivista'){renderMiVista();}
     if(id==='misfinanzas'){renderMisFinanzas();}
