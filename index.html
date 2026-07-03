@@ -43,7 +43,7 @@
   --forest:#0d2e1a;--leaf:#1a5c2e;--leaf2:#2d7a45;--lime:#4caf50;--lime2:#76c442;
   --mint:#a8d5b0;--mist:#e8f5eb;--fog:#f2faf4;--sun:#f0a500;
   --red:#d63031;--sky:#0984e3;--purple:#6c5ce7;--teal:#00b894;--amber:#e17055;
-  --ink:#0d1f12;--ink2:#2d4a35;--ink3:#5a7a62;--ink4:#8aaa90;
+  --ink:#0d1f12;--ink2:#2d4a35;--ink3:#5a7a62;--ink4:#5c7462;
   --bg:#f7faf7;--card:#fff;--border:#e2ece3;
   --shadow:0 2px 12px rgba(13,46,26,.06);--radius:12px;
   /* paleta tonal: un verde protagonista + un acento cálido con propósito (gastos/alertas) */
@@ -52,7 +52,10 @@
   --c-anyelo:#6c5ce7;--c-jonathan:#f0a500;--c-kenny:#00b894;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--ink);min-height:100vh;}
+body{background:var(--bg);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--ink);min-height:100vh;position:relative;}
+body::before{content:'';position:fixed;top:-15%;right:-8%;width:45%;height:60%;background:radial-gradient(ellipse,rgba(26,92,46,.09),transparent 70%);pointer-events:none;z-index:0;}
+body::after{content:'';position:fixed;bottom:-15%;left:-6%;width:38%;height:55%;background:radial-gradient(ellipse,rgba(193,96,63,.06),transparent 70%);pointer-events:none;z-index:0;}
+nav,.page{position:relative;z-index:1;}
 nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-height:54px;gap:2px;position:sticky;top:0;z-index:300;border-bottom:2px solid var(--leaf);flex-wrap:nowrap;position:relative;overflow:hidden;}
 nav::before{content:'';position:absolute;top:-30%;right:-4%;width:220px;height:180%;pointer-events:none;opacity:.10;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 140'%3E%3Cpath d='M10 130 Q50 20 130 30 Q90 55 75 130' fill='none' stroke='%23ffffff' stroke-width='4'/%3E%3Cpath d='M60 135 Q100 45 175 38 Q130 65 118 135' fill='none' stroke='%23ffffff' stroke-width='4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-size:contain;}
 nav>*{position:relative;z-index:1;}
@@ -828,7 +831,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.02.5';
+var APP_VERSION='2026.07.02.6';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
