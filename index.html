@@ -17,7 +17,7 @@
 .login-logo-text{font-size:20px;font-weight:800;color:#0d2e1a;letter-spacing:-.3px;}
 .login-logo-text span{color:#76c442;}
 .login-title{font-size:14px;font-weight:700;color:#2d4a35;margin-bottom:6px;}
-.login-sub{font-size:12px;color:#8aaa90;margin-bottom:24px;}
+.login-sub{font-size:12px;color:#5a7a62;margin-bottom:24px;}
 .login-users{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
 .login-user-btn{display:flex;align-items:center;gap:14px;padding:14px 16px;border:2px solid #c8e6cc;border-radius:12px;background:#f4fbf5;cursor:pointer;transition:all .15s;text-align:left;width:100%;}
 .login-user-btn:hover{border-color:#76c442;background:#e8f5eb;}
@@ -26,7 +26,7 @@
 .login-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0;}
 .login-user-info{}
 .login-user-name{font-size:14px;font-weight:700;color:#0d1f12;}
-.login-user-role{font-size:11px;color:#8aaa90;margin-top:1px;}
+.login-user-role{font-size:11px;color:#5a7a62;margin-top:1px;}
 .login-pw-wrap{margin-bottom:16px;}
 .login-pw-label{font-size:11px;font-weight:700;color:#5a7a62;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
 .login-pw-input{width:100%;padding:10px 14px;border:2px solid #c8e6cc;border-radius:8px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;transition:border .15s;background:#f4fbf5;color:#0d1f12;}
@@ -485,25 +485,25 @@ nav>*{position:relative;z-index:1;}
   <div class="sec">Presupuestado vs real · ingresos acumulados</div>
   <div class="card">
     <div class="ch"><div class="ct">Comparativo · mi parte en cada proyecto</div><div class="ctag" id="mv-vs-tag">proyectado vs real</div></div>
-    <div class="cb" id="mv-vs-list"></div>
+    <div class="cb" id="mv-vs-list"><div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">Cargando…</div></div>
   </div>
 
   <div class="sec">Punto de cruce · ¿cuándo la empresa supera al salario?</div>
   <div class="card">
     <div class="ch"><div class="ct">Modelo de independencia financiera</div><div class="ctag badge-proy">proyectado</div></div>
-    <div class="cb" id="mv-cruce"></div>
+    <div class="cb" id="mv-cruce"><div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">Cargando…</div></div>
   </div>
 
   <div class="sec">📅 Calendario de mis ingresos · cuándo cae la plata</div>
   <div class="card">
     <div class="ch"><div class="ct">Tu parte, mes a mes (según fecha estimada de cosecha)</div><div class="ctag badge-proy">estimado</div></div>
-    <div class="cb" id="mv-calendario"></div>
+    <div class="cb" id="mv-calendario"><div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">Cargando…</div></div>
   </div>
 
   <div class="sec">Ingresos anuales estimados</div>
   <div class="card">
     <div class="ch"><div class="ct">Total de tu parte por año calendario</div><div class="ctag badge-proy">estimado</div></div>
-    <div class="cb" id="mv-anual"></div>
+    <div class="cb" id="mv-anual"><div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">Cargando…</div></div>
   </div>
 </div>
 
@@ -552,11 +552,11 @@ nav>*{position:relative;z-index:1;}
   </div>
   <div class="card">
     <div class="ch"><div class="ct">Ingresos vs gastos por mes</div><div class="ctag" id="fin-flujo-tag">últimos 6 meses</div></div>
-    <div class="cb" id="fin-flujo"></div>
+    <div class="cb" id="fin-flujo"><div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">Cargando…</div></div>
   </div>
   <div class="card">
     <div class="ch"><div class="ct">Real vs presupuestado</div><div class="ctag" id="fin-tag">$0</div></div>
-    <div class="cb" id="fin-bars"></div>
+    <div class="cb" id="fin-bars"><div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">Cargando…</div></div>
   </div>
 </div>
 
@@ -1484,6 +1484,13 @@ function calcIngreso(p){
 function calcGanancia(p){return calcIngreso(p)-p.inv;}
 function darken(hex){return hex;}
 function initials(nombre){return nombre.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();}
+var MESES_CORTOS=['ene','feb','mar','abr','may','jun','jul','ago','set','oct','nov','dic'];
+function fmtFechaCorta(f){
+  if(!f)return '';
+  var d=new Date(f);
+  if(isNaN(d))return f;
+  return d.getDate()+' '+MESES_CORTOS[d.getMonth()]+' '+d.getFullYear();
+}
 
 // ── MOVIMIENTOS ──
 function poblarSelectProyectos(){
@@ -1518,7 +1525,7 @@ function renderTx(){
     var s=t.tipo==='Gasto'?'-':'+';var cm=t.tipo==='Gasto'?'mn':'mpos';
     var cb=t.tipo==='Gasto'?'bg':t.tipo==='Aporte'?'ba':'bi';
     var pnombre=APP.proyectos.find(function(p){return p.id===t.projId;});
-    h+='<div class="tx-row"><span class="tx-f">'+t.fecha+'</span>';
+    h+='<div class="tx-row"><span class="tx-f">'+fmtFechaCorta(t.fecha)+'</span>';
     h+='<span class="txb '+cb+'">'+t.tipo+'</span>';
     h+='<div><div class="tx-d">'+t.desc+'</div><div class="tx-s">'+(t.proveedor||'')+(pnombre?' · '+pnombre.nombre:'')+'</div></div>';
     h+='<span style="font-size:11px;color:var(--ink3)">'+(t.cat||'')+'</span>';
@@ -1536,7 +1543,7 @@ function renderTx(){
 function eliminarTx(id){
   var t=APP.tx.find(function(x){return x.id===id;});
   if(!t)return;
-  if(!confirm('¿Mover este movimiento a la Papelera?\n\n'+t.fecha+' · '+t.desc+' · $'+t.monto+'\n\nSe puede restaurar después desde "🗑 Papelera".'))return;
+  if(!confirm('¿Mover este movimiento a la Papelera?\n\n'+fmtFechaCorta(t.fecha)+' · '+t.desc+' · $'+t.monto+'\n\nSe puede restaurar después desde "🗑 Papelera".'))return;
   var quien=usuarioActual?usuarioActual.nombre:'';
   t.eliminadoPor=quien;t.eliminadoEn=new Date().toISOString();
   APP.tx=APP.tx.filter(function(x){return x.id!==id;});
@@ -1585,7 +1592,7 @@ function renderPapelera(){
     var fecha=t.eliminadoEn?new Date(t.eliminadoEn).toLocaleString('es-CR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
     h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">';
     h+='<div style="flex:1"><div style="font-size:13px;font-weight:700">'+t.desc+'</div>';
-    h+='<div style="font-size:11px;color:var(--ink4)">'+t.fecha+' · $'+parseFloat(t.monto).toLocaleString('es-CR')+' · borrado por '+(t.eliminadoPor||'?')+' el '+fecha+'</div></div>';
+    h+='<div style="font-size:11px;color:var(--ink4)">'+fmtFechaCorta(t.fecha)+' · $'+parseFloat(t.monto).toLocaleString('es-CR')+' · borrado por '+(t.eliminadoPor||'?')+' el '+fecha+'</div></div>';
     h+='<button class="btn btn-ghost btn-sm" onclick="restaurarTx('+t.id+')">↩ Restaurar</button>';
     h+='</div>';
   });
