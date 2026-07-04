@@ -831,7 +831,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.03.4';
+var APP_VERSION='2026.07.04.1';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1719,11 +1719,36 @@ function actualizarPresupuesto(projId,cat,valor){
 // A diferencia de guardar() (modal general), acá no se pregunta proyecto, tipo
 // ni quién lo registra: ya se sabe por contexto (usuarioActual + la tarjeta del
 // proyecto donde está el botón). Pensado para que sea lo más rápido posible.
+var APORTE_EDITANDO={}; // projId -> id del aporte que se está editando (null = registrando uno nuevo)
+// Carga un aporte ya guardado en el mini-formulario para editarlo. Al guardar,
+// el aporte viejo se borra (Papelera, recuperable) y se crea uno nuevo con los
+// valores actualizados — el backend de Sheets no soporta "editar fila in-place",
+// así que editar = borrar + crear, de forma transparente para Anyelo.
+function editarAporteRapido(projId,txId){
+  var t=APP.tx.find(function(x){return x.id===txId;});
+  if(!t)return;
+  document.getElementById('apr-f-'+projId).value=t.fecha;
+  // Si la nota trae el monto original en colones, restaurar esa moneda+monto;
+  // si no, era en USD.
+  var m=/₡([\d.,\s ]+)/.exec(t.notas||'');
+  if(m){
+    document.getElementById('apr-mon-'+projId).value='CRC';
+    document.getElementById('apr-m-'+projId).value=m[1].replace(/[^\d]/g,'');
+  } else {
+    document.getElementById('apr-mon-'+projId).value='USD';
+    document.getElementById('apr-m-'+projId).value=t.monto;
+  }
+  APORTE_EDITANDO[projId]=txId;
+  var btn=document.getElementById('apr-btn-'+projId);
+  if(btn)btn.textContent='💾 Guardar cambios';
+  document.getElementById('apr-f-'+projId).scrollIntoView({behavior:'smooth',block:'center'});
+}
 function registrarAporteRapido(projId){
   var f=document.getElementById('apr-f-'+projId).value;
   var mon=document.getElementById('apr-mon-'+projId).value; // 'USD' o 'CRC'
   var mIngresado=parseFloat(document.getElementById('apr-m-'+projId).value);
   if(!f||!mIngresado||mIngresado<=0){toast('⚠ Completá fecha y monto',true);return;}
+  var editandoId=APORTE_EDITANDO[projId];
   // Todo el dashboard trabaja internamente en USD (p.inv, ganancias, etc.),
   // así que un aporte en colones se convierte al guardar — pero se deja la nota
   // con el monto y tipo de cambio originales para que quede trazable.
@@ -1737,19 +1762,38 @@ function registrarAporteRapido(projId){
   APP.tx.unshift(tx);saveL();
   var btn=document.getElementById('apr-btn-'+projId);
   if(btn){btn.disabled=true;btn.textContent='⏳ Guardando...';}
-  var fila=[tx.id,tx.fecha,tx.tipo,tx.cat,tx.desc,tx.proveedor,tx.socio,tx.cosecha,
-    tx.monto,tx.notas,tx.socio,p?p.nombre:'',tx.projId||'',tx.creadoPor,'',''];
-  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body:JSON.stringify({key:API_KEY,accion:'agregar_fila',hoja:'Transacciones',fila:fila})})
-  .then(function(r){return r.json();})
-  .then(function(res){
-    if(res&&res.ok===false){toast('⚠ '+(res.mensaje||'Error al guardar en Sheets'),true);}
-    else{markSynced(tx.id);toast('✅ Aporte de '+(mon==='CRC'?'₡'+mIngresado.toLocaleString('es-CR'):'$'+m.toLocaleString('es-CR'))+' guardado en Sheets');}
-    renderMiVista();
-  }).catch(function(){
-    toast('⚠ Guardado localmente — sin conexión, se reintentará con Sync Sheets',true);
-    renderMiVista();
-  });
+  function guardarFilaNueva(){
+    var fila=[tx.id,tx.fecha,tx.tipo,tx.cat,tx.desc,tx.proveedor,tx.socio,tx.cosecha,
+      tx.monto,tx.notas,tx.socio,p?p.nombre:'',tx.projId||'',tx.creadoPor,'',''];
+    fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({key:API_KEY,accion:'agregar_fila',hoja:'Transacciones',fila:fila})})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(res&&res.ok===false){toast('⚠ '+(res.mensaje||'Error al guardar en Sheets'),true);}
+      else{markSynced(tx.id);toast('✅ Aporte de '+(mon==='CRC'?'₡'+mIngresado.toLocaleString('es-CR'):'$'+m.toLocaleString('es-CR'))+' guardado en Sheets');}
+      delete APORTE_EDITANDO[projId];
+      renderMiVista();
+    }).catch(function(){
+      toast('⚠ Guardado localmente — sin conexión, se reintentará con Sync Sheets',true);
+      delete APORTE_EDITANDO[projId];
+      renderMiVista();
+    });
+  }
+  if(editandoId){
+    // Borrar (soft-delete, recuperable en Papelera) el aporte viejo antes de
+    // crear el nuevo, para que no queden dos contando el mismo dinero.
+    var viejo=APP.tx.find(function(x){return x.id===editandoId;});
+    if(viejo){
+      viejo.eliminadoPor=usuarioActual.nombre;viejo.eliminadoEn=new Date().toISOString();
+      APP.tx=APP.tx.filter(function(x){return x.id!==editandoId;});
+      if(!APP.papelera)APP.papelera=[];
+      APP.papelera.unshift(viejo);
+      saveL();
+      fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({key:API_KEY,accion:'marcar_eliminado',hoja:'Transacciones',id:editandoId,usuario:usuarioActual.nombre})})
+      .catch(function(){}).then(guardarFilaNueva);
+    } else guardarFilaNueva();
+  } else guardarFilaNueva();
 }
 function guardar(){
   var pid=document.getElementById('n-proj').value;
@@ -1920,7 +1964,25 @@ function renderMiVista(){
     h+='<div class="field" style="width:80px"><label>Moneda</label><select class="fi" id="apr-mon-'+p.id+'"><option value="USD">$ USD</option><option value="CRC">₡ CRC</option></select></div>';
     h+='<div class="field" style="flex:1;min-width:100px"><label>Monto</label><input type="number" class="fi" id="apr-m-'+p.id+'" placeholder="0.00" step="0.01" min="0"></div>';
     h+='<button class="btn btn-primary btn-sm" onclick="registrarAporteRapido('+p.id+')" id="apr-btn-'+p.id+'">💾 Registrar</button>';
-    h+='</div></div>';
+    h+='</div>';
+    // Lista de tus aportes ya registrados en este proyecto — con editar/eliminar,
+    // para que no queden "invisibles" una vez guardados.
+    var misAportes=APP.tx.filter(function(t){return t.projId===p.id&&t.tipo==='Aporte'&&(t.socio||'').toLowerCase().includes(usuarioActual.id);}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
+    if(misAportes.length){
+      h+='<div style="margin-top:12px">';
+      misAportes.forEach(function(t){
+        h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">';
+        h+='<div><span style="font-size:12px;font-weight:600">'+fmtFechaCorta(t.fecha)+'</span>';
+        h+='<span style="font-size:12px;color:var(--ink3);margin-left:8px">'+(t.notas||'$'+t.monto.toLocaleString('es-CR'))+'</span></div>';
+        h+='<div style="display:flex;gap:4px;align-items:center">';
+        h+='<span style="font-size:12px;font-weight:700;color:var(--c-anyelo);font-family:JetBrains Mono,monospace">$'+Math.round(t.monto).toLocaleString('es-CR')+'</span>';
+        h+='<button onclick="editarAporteRapido('+p.id+','+t.id+')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 5px">✎</button>';
+        h+='<button onclick="eliminarTx('+t.id+')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 5px">🗑</button>';
+        h+='</div></div>';
+      });
+      h+='</div>';
+    }
+    h+='</div>';
     // Timeline meses
     h+='<div style="padding:0 14px 14px">';
     h+='<div style="font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Cronograma estimado</div>';
