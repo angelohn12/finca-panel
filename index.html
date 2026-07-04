@@ -631,7 +631,7 @@ nav>*{position:relative;z-index:1;}
       <div class="field"><label>Fecha</label><input type="date" id="n-f" class="fi"></div>
       <div class="field"><label>Cosecha</label><select id="n-c" class="fi"><option value="PC">PC</option><option value="SC">SC</option><option value="General">General</option></select></div>
     </div>
-    <div class="field" style="margin-bottom:11px"><label>Descripción</label><input type="text" id="n-d" class="fi" placeholder="Ej: Compra fertilizante urea"></div>
+    <div class="field" style="margin-bottom:11px"><label>Descripción <span style="text-transform:none;font-weight:400;color:var(--ink4)" id="n-d-opcional"></span></label><input type="text" id="n-d" class="fi" placeholder="Ej: Compra fertilizante urea"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:11px">
       <div class="field"><label>Proveedor / Cliente</label><input type="text" id="n-p" class="fi" placeholder="Nombre"></div>
       <div class="field"><label>Categoría</label>
@@ -831,7 +831,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.03.1';
+var APP_VERSION='2026.07.03.2';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1143,7 +1143,13 @@ function pg(id,btn,skipHash){
   refrescarDesdeSheetsSiPosible(render);
 }
 
-function setT(t,btn){TIPO=t;document.querySelectorAll('.tbtn').forEach(function(b){b.className='tbtn';});if(t==='Gasto')btn.className='tbtn ag';else if(t==='Aporte')btn.className='tbtn aa';else btn.className='tbtn ai';}
+function setT(t,btn){
+  TIPO=t;document.querySelectorAll('.tbtn').forEach(function(b){b.className='tbtn';});
+  if(t==='Gasto')btn.className='tbtn ag';else if(t==='Aporte')btn.className='tbtn aa';else btn.className='tbtn ai';
+  // Un aporte de capital no necesita descripción — con fecha y monto alcanza.
+  var op=document.getElementById('n-d-opcional');
+  if(op)op.textContent=t==='Aporte'?'(opcional — con fecha y monto alcanza)':'';
+}
 
 // ── COLORES PICKER ──
 function buildColorPick(){
@@ -1714,7 +1720,8 @@ function guardar(){
   var f=document.getElementById('n-f').value;
   var d=document.getElementById('n-d').value.trim();
   var m=parseFloat(document.getElementById('n-m').value);
-  if(!f||!d||!m||m<=0){toast('⚠ Completá fecha, descripción y monto',true);return;}
+  if(TIPO==='Aporte'&&!d)d='Aporte de capital';
+  if(!f||!d||!m||m<=0){toast('⚠ Completá fecha'+(TIPO==='Aporte'?'':' y descripción')+' y monto',true);return;}
   var tx={id:APP.nextId++,projId:pid?parseInt(pid):null,fecha:f,tipo:TIPO,
     cat:document.getElementById('n-cat').value,desc:d,
     proveedor:document.getElementById('n-p').value.trim(),
@@ -1851,6 +1858,24 @@ function renderMiVista(){
     h+='<div style="display:flex;justify-content:space-between;margin-top:3px">';
     h+='<span style="font-size:10px;color:var(--ink4)">Gastado: $'+APP.tx.filter(function(t){return t.projId===p.id&&t.tipo==="Gasto";}).reduce(function(a,t){return a+parseFloat(t.monto);},0).toLocaleString("es-CR",{minimumFractionDigits:0})+'</span>';
     h+='<span style="font-size:10px;color:var(--ink4)">Presupuesto: $'+p.inv.toLocaleString("es-CR",{minimumFractionDigits:0})+'</span>';
+    h+='</div></div>';
+    // Tu inversión real (lo que vos realmente pusiste, registrado como movimientos
+    // tipo "Aporte") vs tu ganancia neta personal (tu parte de ingresos reales
+    // menos lo que realmente pusiste) — distinto del "aporte planeado" de arriba.
+    var aporteReal=APP.tx.filter(function(t){return t.projId===p.id&&t.tipo==='Aporte'&&(t.socio||'').toLowerCase().includes(usuarioActual.id);}).reduce(function(a,t){return a+parseFloat(t.monto);},0);
+    var gananciaNetaPersonal=esReal?(tuParteReal-aporteReal):0;
+    h+='<div style="padding:0 14px 14px">';
+    h+='<div class="sec" style="margin:4px 0 10px">Tu inversión real</div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:11px">';
+    h+='<div style="background:var(--fog);border-radius:8px;padding:12px">';
+    h+='<div style="font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Has puesto (real)</div>';
+    h+='<div style="font-size:19px;font-weight:800;color:var(--c-anyelo)">$'+Math.round(aporteReal).toLocaleString('es-CR')+'</div>';
+    h+='<div style="font-size:10px;color:var(--ink4);margin-top:3px">'+(aporteReal>0?'según tus movimientos "Aporte" registrados':'registrá tus aportes en Movimientos')+'</div></div>';
+    h+='<div style="background:'+(esReal&&aporteReal>0?'#e8f5eb':'var(--fog)')+';border-radius:8px;padding:12px;border:'+(esReal&&aporteReal>0?'1px solid var(--mint)':'none')+'">';
+    h+='<div style="font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Ganancia neta personal</div>';
+    var textoGanNeta=!esReal?'— sin ingresos aún':(aporteReal<=0?'— falta registrar tu aporte':(gananciaNetaPersonal>=0?'+ $':'− $')+Math.round(Math.abs(gananciaNetaPersonal)).toLocaleString('es-CR'));
+    h+='<div style="font-size:19px;font-weight:800;color:'+(!esReal||aporteReal<=0?'var(--ink4)':gananciaNetaPersonal>=0?'var(--leaf)':'var(--terracota)')+'">'+textoGanNeta+'</div>';
+    h+='<div style="font-size:10px;color:var(--ink4);margin-top:3px">tu parte de ingresos reales, menos lo que pusiste</div></div>';
     h+='</div></div>';
     // Timeline meses
     h+='<div style="padding:0 14px 14px">';
