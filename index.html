@@ -831,7 +831,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.04.3';
+var APP_VERSION='2026.07.04.4';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1976,7 +1976,10 @@ function renderMiVista(){
     h+='<div style="background:var(--fog);border-radius:8px;padding:12px">';
     h+='<div style="font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Has puesto (real)</div>';
     h+='<div style="font-size:19px;font-weight:800;color:var(--c-anyelo)">$'+Math.round(aporteReal).toLocaleString('es-CR')+'</div>';
-    h+='<div style="font-size:10px;color:var(--ink4);margin-top:3px">'+(aporteReal>0?'según tus movimientos "Aporte" registrados':'registrá tus aportes en Movimientos')+'</div></div>';
+    // También en colones, al tipo de cambio de referencia — para que Anyelo vea
+    // ambas monedas en el total, no solo dólares.
+    if(aporteReal>0)h+='<div style="font-size:13px;font-weight:700;color:var(--ink2);font-family:JetBrains Mono,monospace;margin-top:1px">≈ ₡'+Math.round(aporteReal*TC_MERCADO).toLocaleString('es-CR')+'</div>';
+    h+='<div style="font-size:10px;color:var(--ink4);margin-top:3px">'+(aporteReal>0?'según tus aportes registrados (₡'+TC_MERCADO+'/$)':'registrá tus aportes abajo')+'</div></div>';
     h+='<div style="background:'+(esReal&&aporteReal>0?'#e8f5eb':'var(--fog)')+';border-radius:8px;padding:12px;border:'+(esReal&&aporteReal>0?'1px solid var(--mint)':'none')+'">';
     h+='<div style="font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Ganancia neta personal</div>';
     var textoGanNeta=!esReal?'— sin ingresos aún':(aporteReal<=0?'— falta registrar tu aporte':(gananciaNetaPersonal>=0?'+ $':'− $')+Math.round(Math.abs(gananciaNetaPersonal)).toLocaleString('es-CR'));
