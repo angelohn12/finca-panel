@@ -831,7 +831,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.03.3';
+var APP_VERSION='2026.07.03.4';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1721,12 +1721,18 @@ function actualizarPresupuesto(projId,cat,valor){
 // proyecto donde está el botón). Pensado para que sea lo más rápido posible.
 function registrarAporteRapido(projId){
   var f=document.getElementById('apr-f-'+projId).value;
-  var m=parseFloat(document.getElementById('apr-m-'+projId).value);
-  if(!f||!m||m<=0){toast('⚠ Completá fecha y monto',true);return;}
+  var mon=document.getElementById('apr-mon-'+projId).value; // 'USD' o 'CRC'
+  var mIngresado=parseFloat(document.getElementById('apr-m-'+projId).value);
+  if(!f||!mIngresado||mIngresado<=0){toast('⚠ Completá fecha y monto',true);return;}
+  // Todo el dashboard trabaja internamente en USD (p.inv, ganancias, etc.),
+  // así que un aporte en colones se convierte al guardar — pero se deja la nota
+  // con el monto y tipo de cambio originales para que quede trazable.
+  var m=mon==='CRC'?(mIngresado/TC_MERCADO):mIngresado;
+  var notaMoneda=mon==='CRC'?('Depositado: ₡'+mIngresado.toLocaleString('es-CR')+' (tipo de cambio ₡'+TC_MERCADO+'/$)'):'';
   var p=APP.proyectos.find(function(x){return x.id===projId;});
   var tx={id:APP.nextId++,projId:projId,fecha:f,tipo:'Aporte',cat:'Capital',
     desc:'Aporte de capital',proveedor:'',socio:usuarioActual.nombre,
-    cosecha:(p&&p.ciclo)||'General',monto:m,notas:'',
+    cosecha:(p&&p.ciclo)||'General',monto:m,notas:notaMoneda,
     creadoPor:usuarioActual.nombre};
   APP.tx.unshift(tx);saveL();
   var btn=document.getElementById('apr-btn-'+projId);
@@ -1738,7 +1744,7 @@ function registrarAporteRapido(projId){
   .then(function(r){return r.json();})
   .then(function(res){
     if(res&&res.ok===false){toast('⚠ '+(res.mensaje||'Error al guardar en Sheets'),true);}
-    else{markSynced(tx.id);toast('✅ Aporte de $'+m.toLocaleString('es-CR')+' guardado en Sheets');}
+    else{markSynced(tx.id);toast('✅ Aporte de '+(mon==='CRC'?'₡'+mIngresado.toLocaleString('es-CR'):'$'+m.toLocaleString('es-CR'))+' guardado en Sheets');}
     renderMiVista();
   }).catch(function(){
     toast('⚠ Guardado localmente — sin conexión, se reintentará con Sync Sheets',true);
@@ -1911,7 +1917,8 @@ function renderMiVista(){
     // (usuarioActual) y en qué proyecto estás, no hace falta preguntar nada más.
     h+='<div style="display:flex;gap:8px;align-items:end;margin-top:10px;flex-wrap:wrap">';
     h+='<div class="field" style="flex:1;min-width:120px"><label>Fecha</label><input type="date" class="fi" id="apr-f-'+p.id+'" value="'+new Date().toISOString().slice(0,10)+'"></div>';
-    h+='<div class="field" style="flex:1;min-width:100px"><label>Monto USD</label><input type="number" class="fi" id="apr-m-'+p.id+'" placeholder="0.00" step="0.01" min="0"></div>';
+    h+='<div class="field" style="width:80px"><label>Moneda</label><select class="fi" id="apr-mon-'+p.id+'"><option value="USD">$ USD</option><option value="CRC">₡ CRC</option></select></div>';
+    h+='<div class="field" style="flex:1;min-width:100px"><label>Monto</label><input type="number" class="fi" id="apr-m-'+p.id+'" placeholder="0.00" step="0.01" min="0"></div>';
     h+='<button class="btn btn-primary btn-sm" onclick="registrarAporteRapido('+p.id+')" id="apr-btn-'+p.id+'">💾 Registrar</button>';
     h+='</div></div>';
     // Timeline meses
