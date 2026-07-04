@@ -647,11 +647,12 @@ nav>*{position:relative;z-index:1;}
       <div class="field"><label>Registrado por</label>
         <select id="n-s" class="fi"><option value="Socio 1">Socio 1</option><option value="Socio 2">Socio 2</option><option value="Socio 3">Socio 3</option></select>
       </div>
-      <div class="field"><label>Monto USD</label>
-        <div style="position:relative">
-          <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;font-weight:700;color:var(--ink3)">$</span>
-          <input type="number" id="n-m" class="fi" style="padding-left:26px;font-size:17px;font-weight:700" placeholder="0.00" step="0.01" min="0">
+      <div class="field"><label>Monto</label>
+        <div style="display:flex;gap:6px">
+          <select id="n-mon" class="fi" style="width:78px;flex-shrink:0" onchange="actualizarEquivalenteMonto()"><option value="USD">$ USD</option><option value="CRC">₡ CRC</option></select>
+          <input type="number" id="n-m" class="fi" style="font-size:17px;font-weight:700" placeholder="0.00" step="0.01" min="0" oninput="actualizarEquivalenteMonto()">
         </div>
+        <div id="n-m-equiv" style="font-size:11px;color:var(--ink4);margin-top:3px"></div>
       </div>
     </div>
     <div class="field" style="margin-bottom:14px"><label>Notas</label><textarea id="n-n" class="fi" style="min-height:48px;resize:vertical"></textarea></div>
@@ -831,7 +832,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.04.1';
+var APP_VERSION='2026.07.04.2';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1485,7 +1486,7 @@ function editarProyecto(pid){
   document.getElementById('modal-proj').classList.add('open');
 }
 
-var TC_MERCADO=520; // colones por dólar, referencia para convertir el mercado nacional (que cotiza en ₡)
+var TC_MERCADO=500; // colones por dólar, referencia para convertir el mercado nacional (que cotiza en ₡) y aportes/gastos en colones
 
 function calcIngreso(p){
   var ton=p.ha*(p.rend||100)*(1-(p.mort||5)/100);
@@ -1526,6 +1527,15 @@ function poblarSelectProyectos(){
   });
 }
 
+// Si el movimiento se registró en colones, las notas empiezan con "[₡X @ ₡Y/$]".
+// Esta función arma el texto que muestra AMBOS montos (nunca solo el convertido).
+function montoDualTexto(t){
+  var s=t.tipo==='Gasto'?'-':'+';
+  var usd=s+'$'+parseFloat(t.monto).toLocaleString('es-CR',{minimumFractionDigits:2});
+  var m=/^\[₡([\d.,\s]+) @/.exec(t.notas||'');
+  if(!m)return usd;
+  return '₡'+m[1].trim()+' <span style="opacity:.6;font-size:10px">('+usd+')</span>';
+}
 function renderTx(){
   var ft=document.getElementById('ft').value;
   var fc=document.getElementById('fc').value;
@@ -1553,7 +1563,7 @@ function renderTx(){
     h+='<div><div class="tx-d">'+t.desc+'</div><div class="tx-s">'+(t.proveedor||'')+(pnombre?' · '+pnombre.nombre:'')+'</div></div>';
     h+='<span style="font-size:11px;color:var(--ink3)">'+(t.cat||'')+'</span>';
     h+='<span style="font-size:10px;font-weight:700;font-family:JetBrains Mono,monospace;color:var(--ink4)">'+(t.cosecha||'')+'</span>';
-    h+='<span class="tx-m '+cm+'">'+s+'$'+parseFloat(t.monto).toLocaleString('es-CR',{minimumFractionDigits:2})+'</span>';
+    h+='<span class="tx-m '+cm+'">'+montoDualTexto(t)+'</span>';
     h+='<span onclick="eliminarTx('+t.id+')" title="Eliminar" style="cursor:pointer;color:var(--ink4);font-size:15px;text-align:center;padding:2px 6px;border-radius:5px" onmouseover="this.style.background=\'var(--red)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--ink4)\'">🗑</span></div>';
   });
   document.getElementById('tx-list').innerHTML=h;
@@ -1753,7 +1763,7 @@ function registrarAporteRapido(projId){
   // así que un aporte en colones se convierte al guardar — pero se deja la nota
   // con el monto y tipo de cambio originales para que quede trazable.
   var m=mon==='CRC'?(mIngresado/TC_MERCADO):mIngresado;
-  var notaMoneda=mon==='CRC'?('Depositado: ₡'+mIngresado.toLocaleString('es-CR')+' (tipo de cambio ₡'+TC_MERCADO+'/$)'):'';
+  var notaMoneda=mon==='CRC'?('[₡'+mIngresado.toLocaleString('es-CR')+' @ ₡'+TC_MERCADO+'/$]'):'';
   var p=APP.proyectos.find(function(x){return x.id===projId;});
   var tx={id:APP.nextId++,projId:projId,fecha:f,tipo:'Aporte',cat:'Capital',
     desc:'Aporte de capital',proveedor:'',socio:usuarioActual.nombre,
@@ -1795,19 +1805,41 @@ function registrarAporteRapido(projId){
     } else guardarFilaNueva();
   } else guardarFilaNueva();
 }
+// Muestra en vivo, debajo del campo Monto, el equivalente en la otra moneda
+// mientras Anyelo escribe — así ve ambos montos ANTES de guardar, no solo
+// después. Se ve siempre en $ y ₡ juntos, nunca uno escondido en letra chica.
+function actualizarEquivalenteMonto(){
+  var mon=document.getElementById('n-mon').value;
+  var v=parseFloat(document.getElementById('n-m').value)||0;
+  var el=document.getElementById('n-m-equiv');
+  if(!el)return;
+  if(!v){el.textContent='';return;}
+  el.textContent=mon==='CRC'
+    ?'≈ $'+(v/TC_MERCADO).toLocaleString('es-CR',{maximumFractionDigits:2})+' (tipo de cambio ₡'+TC_MERCADO+'/$)'
+    :'≈ ₡'+Math.round(v*TC_MERCADO).toLocaleString('es-CR')+' (tipo de cambio ₡'+TC_MERCADO+'/$)';
+}
 function guardar(){
   var pid=document.getElementById('n-proj').value;
   var f=document.getElementById('n-f').value;
   var d=document.getElementById('n-d').value.trim();
-  var m=parseFloat(document.getElementById('n-m').value);
+  var mon=document.getElementById('n-mon').value; // 'USD' o 'CRC'
+  var mIngresado=parseFloat(document.getElementById('n-m').value);
   if(TIPO==='Aporte'&&!d)d='Aporte de capital';
-  if(!f||!d||!m||m<=0){toast('⚠ Completá fecha'+(TIPO==='Aporte'?'':' y descripción')+' y monto',true);return;}
+  if(!f||!d||!mIngresado||mIngresado<=0){toast('⚠ Completá fecha'+(TIPO==='Aporte'?'':' y descripción')+' y monto',true);return;}
+  // Todo el dashboard calcula internamente en USD, así que un monto en colones
+  // se convierte al guardar. El monto original en ₡ se guarda al inicio de las
+  // notas (mismo patrón que el aporte rápido de Mi Vista) — así el Sheet no
+  // necesita columnas nuevas ni redeploy de Apps Script, y el dashboard puede
+  // mostrar SIEMPRE ambos montos (₡ y $) parseando esa nota.
+  var m=mon==='CRC'?(mIngresado/TC_MERCADO):mIngresado;
+  var notasUsuario=document.getElementById('n-n').value.trim();
+  var notaMoneda=mon==='CRC'?('₡'+mIngresado.toLocaleString('es-CR')+' @ ₡'+TC_MERCADO+'/$'):'';
   var tx={id:APP.nextId++,projId:pid?parseInt(pid):null,fecha:f,tipo:TIPO,
     cat:document.getElementById('n-cat').value,desc:d,
     proveedor:document.getElementById('n-p').value.trim(),
     socio:document.getElementById('n-s').value,
     cosecha:document.getElementById('n-c').value,
-    monto:m,notas:document.getElementById('n-n').value.trim(),
+    monto:m,notas:(notaMoneda?'['+notaMoneda+'] ':'')+notasUsuario,
     creadoPor:usuarioActual?usuarioActual.nombre:''};
   APP.tx.unshift(tx);saveL();
   var pnombre=APP.proyectos.find(function(p){return p.id===tx.projId;});
@@ -1971,11 +2003,13 @@ function renderMiVista(){
     if(misAportes.length){
       h+='<div style="margin-top:12px">';
       misAportes.forEach(function(t){
+        var mCRC=/^\[₡([\d.,\s]+) @/.exec(t.notas||'');
         h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">';
-        h+='<div><span style="font-size:12px;font-weight:600">'+fmtFechaCorta(t.fecha)+'</span>';
-        h+='<span style="font-size:12px;color:var(--ink3);margin-left:8px">'+(t.notas||'$'+t.monto.toLocaleString('es-CR'))+'</span></div>';
-        h+='<div style="display:flex;gap:4px;align-items:center">';
-        h+='<span style="font-size:12px;font-weight:700;color:var(--c-anyelo);font-family:JetBrains Mono,monospace">$'+Math.round(t.monto).toLocaleString('es-CR')+'</span>';
+        h+='<div><span style="font-size:12px;font-weight:600">'+fmtFechaCorta(t.fecha)+'</span></div>';
+        h+='<div style="display:flex;gap:8px;align-items:center">';
+        // Los dos montos siempre visibles con el mismo peso — nunca uno escondido.
+        if(mCRC)h+='<span style="font-size:13px;font-weight:700;color:var(--ink2);font-family:JetBrains Mono,monospace">₡'+mCRC[1].trim()+'</span><span style="color:var(--ink4)">≈</span>';
+        h+='<span style="font-size:13px;font-weight:700;color:var(--c-anyelo);font-family:JetBrains Mono,monospace">$'+Math.round(t.monto).toLocaleString('es-CR')+'</span>';
         h+='<button onclick="editarAporteRapido('+p.id+','+t.id+')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 5px">✎</button>';
         h+='<button onclick="eliminarTx('+t.id+')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 5px">🗑</button>';
         h+='</div></div>';
