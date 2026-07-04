@@ -831,7 +831,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.03.2';
+var APP_VERSION='2026.07.03.3';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1715,6 +1715,36 @@ function actualizarPresupuesto(projId,cat,valor){
   renderFin();
 }
 
+// Registro rápido de "yo puse esta plata" desde Mi Vista — solo fecha + monto.
+// A diferencia de guardar() (modal general), acá no se pregunta proyecto, tipo
+// ni quién lo registra: ya se sabe por contexto (usuarioActual + la tarjeta del
+// proyecto donde está el botón). Pensado para que sea lo más rápido posible.
+function registrarAporteRapido(projId){
+  var f=document.getElementById('apr-f-'+projId).value;
+  var m=parseFloat(document.getElementById('apr-m-'+projId).value);
+  if(!f||!m||m<=0){toast('⚠ Completá fecha y monto',true);return;}
+  var p=APP.proyectos.find(function(x){return x.id===projId;});
+  var tx={id:APP.nextId++,projId:projId,fecha:f,tipo:'Aporte',cat:'Capital',
+    desc:'Aporte de capital',proveedor:'',socio:usuarioActual.nombre,
+    cosecha:(p&&p.ciclo)||'General',monto:m,notas:'',
+    creadoPor:usuarioActual.nombre};
+  APP.tx.unshift(tx);saveL();
+  var btn=document.getElementById('apr-btn-'+projId);
+  if(btn){btn.disabled=true;btn.textContent='⏳ Guardando...';}
+  var fila=[tx.id,tx.fecha,tx.tipo,tx.cat,tx.desc,tx.proveedor,tx.socio,tx.cosecha,
+    tx.monto,tx.notas,tx.socio,p?p.nombre:'',tx.projId||'',tx.creadoPor,'',''];
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({key:API_KEY,accion:'agregar_fila',hoja:'Transacciones',fila:fila})})
+  .then(function(r){return r.json();})
+  .then(function(res){
+    if(res&&res.ok===false){toast('⚠ '+(res.mensaje||'Error al guardar en Sheets'),true);}
+    else{markSynced(tx.id);toast('✅ Aporte de $'+m.toLocaleString('es-CR')+' guardado en Sheets');}
+    renderMiVista();
+  }).catch(function(){
+    toast('⚠ Guardado localmente — sin conexión, se reintentará con Sync Sheets',true);
+    renderMiVista();
+  });
+}
 function guardar(){
   var pid=document.getElementById('n-proj').value;
   var f=document.getElementById('n-f').value;
@@ -1876,6 +1906,13 @@ function renderMiVista(){
     var textoGanNeta=!esReal?'— sin ingresos aún':(aporteReal<=0?'— falta registrar tu aporte':(gananciaNetaPersonal>=0?'+ $':'− $')+Math.round(Math.abs(gananciaNetaPersonal)).toLocaleString('es-CR'));
     h+='<div style="font-size:19px;font-weight:800;color:'+(!esReal||aporteReal<=0?'var(--ink4)':gananciaNetaPersonal>=0?'var(--leaf)':'var(--terracota)')+'">'+textoGanNeta+'</div>';
     h+='<div style="font-size:10px;color:var(--ink4);margin-top:3px">tu parte de ingresos reales, menos lo que pusiste</div></div>';
+    h+='</div>';
+    // Registro rápido de aporte: solo fecha + monto — ya sabemos quién sos
+    // (usuarioActual) y en qué proyecto estás, no hace falta preguntar nada más.
+    h+='<div style="display:flex;gap:8px;align-items:end;margin-top:10px;flex-wrap:wrap">';
+    h+='<div class="field" style="flex:1;min-width:120px"><label>Fecha</label><input type="date" class="fi" id="apr-f-'+p.id+'" value="'+new Date().toISOString().slice(0,10)+'"></div>';
+    h+='<div class="field" style="flex:1;min-width:100px"><label>Monto USD</label><input type="number" class="fi" id="apr-m-'+p.id+'" placeholder="0.00" step="0.01" min="0"></div>';
+    h+='<button class="btn btn-primary btn-sm" onclick="registrarAporteRapido('+p.id+')" id="apr-btn-'+p.id+'">💾 Registrar</button>';
     h+='</div></div>';
     // Timeline meses
     h+='<div style="padding:0 14px 14px">';
