@@ -516,9 +516,8 @@ nav>*{position:relative;z-index:1;}
       <button class="btn btn-primary" onclick="document.getElementById('modal-mov').classList.add('open')">+ Nuevo movimiento</button>
     </div>
   </div>
-  <div class="g4">
+  <div class="g3">
     <div class="kpi r"><div class="kl">Total gastos</div><div class="kv" id="m-g">$0</div><div class="ks" id="m-gn">0 registros</div></div>
-    <div class="kpi g"><div class="kl">Total aportes</div><div class="kv" id="m-a">$0</div><div class="ks">Capital registrado</div></div>
     <div class="kpi b"><div class="kl">Ingresos reales</div><div class="kv" id="m-i">$0</div><div class="ks">Ventas registradas</div></div>
     <div class="kpi s"><div class="kl">Proyecto</div>
       <select id="mov-proj-filter" onchange="renderTx()" style="font-size:12px;font-weight:700;border:none;background:none;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;outline:none;width:100%;margin-top:4px;cursor:pointer"></select>
@@ -527,9 +526,10 @@ nav>*{position:relative;z-index:1;}
   <div class="card">
     <div class="ch">
       <div class="ct">Libro de transacciones</div>
+      <div style="font-size:10px;color:var(--ink4)" title="Los aportes personales se ven solo en Mi Vista, no acá.">Gastos e ingresos del negocio · los aportes personales están en Mi Vista</div>
       <div style="display:flex;gap:7px">
         <select id="ft" onchange="renderTx()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--fog)">
-          <option value="">Todos</option><option value="Gasto">Gastos</option><option value="Aporte">Aportes</option><option value="Ingreso">Ingresos</option>
+          <option value="">Todos</option><option value="Gasto">Gastos</option><option value="Ingreso">Ingresos</option>
         </select>
         <select id="fc" onchange="renderTx()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--fog)">
           <option value="">PC y SC</option><option value="PC">PC</option><option value="SC">SC</option>
@@ -623,7 +623,6 @@ nav>*{position:relative;z-index:1;}
       <label>Tipo</label>
       <div class="tipo-group">
         <button class="tbtn ag" onclick="setT('Gasto',this)">💸 Gasto</button>
-        <button class="tbtn" onclick="setT('Aporte',this)">💰 Aporte</button>
         <button class="tbtn" onclick="setT('Ingreso',this)">📈 Ingreso</button>
       </div>
     </div>
@@ -832,7 +831,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.04.2';
+var APP_VERSION='2026.07.04.3';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1540,8 +1539,10 @@ function renderTx(){
   var ft=document.getElementById('ft').value;
   var fc=document.getElementById('fc').value;
   var fp=document.getElementById('mov-proj-filter').value;
+  // Los "Aporte" son personales (cuánto puso cada quien) — viven solo en Mi
+  // Vista, nunca en el libro de Movimientos compartido.
   var lista=APP.tx.filter(function(t){
-    return(!ft||t.tipo===ft)&&(!fc||t.cosecha===fc)&&(!fp||String(t.projId)===fp);
+    return t.tipo!=='Aporte'&&(!ft||t.tipo===ft)&&(!fc||t.cosecha===fc)&&(!fp||String(t.projId)===fp);
   });
   if(!lista.length){
     var hayFiltros=ft||fc||fp;
@@ -1636,18 +1637,11 @@ function renderKPIs(){
   var fp=document.getElementById('mov-proj-filter')?document.getElementById('mov-proj-filter').value:'';
   var lista=APP.tx.filter(function(t){return!fp||String(t.projId)===fp;});
   var g=lista.filter(function(t){return t.tipo==='Gasto';});
-  var a=lista.filter(function(t){return t.tipo==='Aporte';});
   var i=lista.filter(function(t){return t.tipo==='Ingreso';});
   var tg=g.reduce(function(s,t){return s+parseFloat(t.monto);},0);
-  var ta=a.reduce(function(s,t){return s+parseFloat(t.monto);},0);
   var ti=i.reduce(function(s,t){return s+parseFloat(t.monto);},0);
-  // Inversión de referencia: la del proyecto filtrado, o la suma de todos.
-  var inv=fp?((APP.proyectos.find(function(p){return String(p.id)===fp;})||{}).inv||0)
-            :APP.proyectos.reduce(function(s,p){return s+(p.inv||0);},0);
-  var e=inv>0?Math.round((tg/inv)*100):0;
   document.getElementById('m-g').textContent='$'+tg.toLocaleString('es-CR',{minimumFractionDigits:0});
   document.getElementById('m-gn').textContent=g.length+' transacciones';
-  document.getElementById('m-a').textContent='$'+ta.toLocaleString('es-CR',{minimumFractionDigits:0});
   document.getElementById('m-i').textContent='$'+ti.toLocaleString('es-CR',{minimumFractionDigits:0});
 }
 
@@ -2003,7 +1997,7 @@ function renderMiVista(){
     if(misAportes.length){
       h+='<div style="margin-top:12px">';
       misAportes.forEach(function(t){
-        var mCRC=/^\[₡([\d.,\s]+) @/.exec(t.notas||'');
+        var mCRC=/₡([\d.,\s]+)/.exec(t.notas||''); // soporta el formato viejo ("Depositado: ₡X...") y el nuevo ("[₡X @ ...")
         h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">';
         h+='<div><span style="font-size:12px;font-weight:600">'+fmtFechaCorta(t.fecha)+'</span></div>';
         h+='<div style="display:flex;gap:8px;align-items:center">';
