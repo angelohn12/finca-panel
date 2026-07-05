@@ -797,7 +797,7 @@ nav>*{position:relative;z-index:1;}
       <div class="field"><label>Salario bruto ($/mes)</label><input type="number" id="mss-bruto" class="fi" min="0" step="25" placeholder="0"></div>
       <div class="field"><label>Salario neto ($/mes)</label><input type="number" id="mss-neto" class="fi" min="0" step="25" placeholder="0"></div>
     </div>
-    <div class="field" style="margin-bottom:14px"><label>Tipo de cambio (₡ por $)</label><input type="number" id="mss-tc" class="fi" min="1" step="1" placeholder="520"></div>
+    <div class="field" style="margin-bottom:14px"><label>Tipo de cambio (₡ por $)</label><input type="number" id="mss-tc" class="fi" min="1" step="1" placeholder="500"></div>
     <div style="display:flex;gap:9px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="cerrarModal('modal-salario')">Cancelar</button>
       <button class="btn btn-primary" onclick="guardarSalario()">💾 Guardar</button>
@@ -841,7 +841,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.05.1';
+var APP_VERSION='2026.07.05.2';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1576,6 +1576,16 @@ function poblarSelectProyectos(){
 
 // Si el movimiento se registró en colones, las notas empiezan con "[₡X @ ₡Y/$]".
 // Esta función arma el texto que muestra AMBOS montos (nunca solo el convertido).
+// Colón ORIGINAL de un movimiento (fuente de verdad para montos en ₡).
+// Soporta el formato nuevo "[₡X @ ₡Y/$]" y el viejo "Depositado: ₡X (...)".
+// Si el movimiento se hizo en dólares (sin nota de ₡), devuelve null.
+function montoCRCoriginal(t){
+  var notas=t.notas||'';
+  var m=/₡([\d.,\s]+)/.exec(notas);
+  if(!m)return null;
+  var n=parseFloat(m[1].replace(/[^\d]/g,''));
+  return isNaN(n)?null:n;
+}
 function montoDualTexto(t){
   var s=t.tipo==='Gasto'?'-':'+';
   var usd=s+'$'+parseFloat(t.monto).toLocaleString('es-CR',{minimumFractionDigits:2});
@@ -1804,7 +1814,7 @@ function registrarAporteRapido(projId){
   // Todo el dashboard trabaja internamente en USD (p.inv, ganancias, etc.),
   // así que un aporte en colones se convierte al guardar — pero se deja la nota
   // con el monto y tipo de cambio originales para que quede trazable.
-  var m=mon==='CRC'?(mIngresado/TC_MERCADO):mIngresado;
+  var m=mon==='CRC'?Math.round((mIngresado/TC_MERCADO)*100)/100:mIngresado;
   var notaMoneda=mon==='CRC'?('[₡'+mIngresado.toLocaleString('es-CR')+' @ ₡'+TC_MERCADO+'/$]'):'';
   var p=APP.proyectos.find(function(x){return x.id===projId;});
   var tx={id:APP.nextId++,projId:projId,fecha:f,tipo:'Aporte',cat:'Capital',
@@ -1873,7 +1883,7 @@ function guardar(){
   // notas (mismo patrón que el aporte rápido de Mi Vista) — así el Sheet no
   // necesita columnas nuevas ni redeploy de Apps Script, y el dashboard puede
   // mostrar SIEMPRE ambos montos (₡ y $) parseando esa nota.
-  var m=mon==='CRC'?(mIngresado/TC_MERCADO):mIngresado;
+  var m=mon==='CRC'?Math.round((mIngresado/TC_MERCADO)*100)/100:mIngresado;
   var notasUsuario=document.getElementById('n-n').value.trim();
   var notaMoneda=mon==='CRC'?('₡'+mIngresado.toLocaleString('es-CR')+' @ ₡'+TC_MERCADO+'/$'):'';
   var tx={id:APP.nextId++,projId:pid?parseInt(pid):null,fecha:f,tipo:TIPO,
@@ -2016,7 +2026,15 @@ function renderMiVista(){
     // Tu inversión real (lo que vos realmente pusiste, registrado como movimientos
     // tipo "Aporte") vs tu ganancia neta personal (tu parte de ingresos reales
     // menos lo que realmente pusiste) — distinto del "aporte planeado" de arriba.
-    var aporteReal=APP.tx.filter(function(t){return t.projId===p.id&&t.tipo==='Aporte'&&(t.socio||'').toLowerCase().includes(usuarioActual.id);}).reduce(function(a,t){return a+parseFloat(t.monto);},0);
+    var misAportesTx=APP.tx.filter(function(t){return t.projId===p.id&&t.tipo==='Aporte'&&(t.socio||'').toLowerCase().includes(usuarioActual.id);});
+    var aporteReal=misAportesTx.reduce(function(a,t){return a+parseFloat(t.monto);},0);
+    // Total en colones = SUMA de los colones REALES depositados (fuente de verdad),
+    // no reconstruido desde el total USD. Para aportes hechos directo en dólares
+    // (sin nota de ₡), se usa el USD convertido al TC de referencia como aproximación.
+    var aporteRealCRC=misAportesTx.reduce(function(a,t){
+      var crc=montoCRCoriginal(t);
+      return a + (crc!==null ? crc : parseFloat(t.monto)*TC_MERCADO);
+    },0);
     var gananciaNetaPersonal=esReal?(tuParteReal-aporteReal):0;
     h+='<div style="padding:0 14px 14px">';
     h+='<div class="sec" style="margin:4px 0 10px">Tu inversión real</div>';
@@ -2026,7 +2044,7 @@ function renderMiVista(){
     h+='<div style="font-size:19px;font-weight:800;color:var(--c-anyelo)">$'+Math.round(aporteReal).toLocaleString('es-CR')+'</div>';
     // También en colones, al tipo de cambio de referencia — para que Anyelo vea
     // ambas monedas en el total, no solo dólares.
-    if(aporteReal>0)h+='<div style="font-size:13px;font-weight:700;color:var(--ink2);font-family:JetBrains Mono,monospace;margin-top:1px">≈ ₡'+Math.round(aporteReal*TC_MERCADO).toLocaleString('es-CR')+'</div>';
+    if(aporteReal>0)h+='<div style="font-size:13px;font-weight:700;color:var(--ink2);font-family:JetBrains Mono,monospace;margin-top:1px">= ₡'+Math.round(aporteRealCRC).toLocaleString('es-CR')+'</div>';
     h+='<div style="font-size:10px;color:var(--ink4);margin-top:3px">'+(aporteReal>0?'según tus aportes registrados (₡'+TC_MERCADO+'/$)':'registrá tus aportes abajo')+'</div></div>';
     h+='<div style="background:'+(esReal&&aporteReal>0?'#e8f5eb':'var(--fog)')+';border-radius:8px;padding:12px;border:'+(esReal&&aporteReal>0?'1px solid var(--mint)':'none')+'">';
     h+='<div style="font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Ganancia neta personal</div>';
