@@ -686,14 +686,12 @@ nav>*{position:relative;z-index:1;}
     <button class="pf-tab" onclick="pfTab('gastos',this)">💸 Mis Gastos</button>
     <button class="pf-tab" onclick="pfTab('integracion',this)">🍍 Empresa</button>
     <button class="pf-tab" onclick="pfTab('deudas',this)">🏦 Deudas</button>
-    <button class="pf-tab" onclick="pfTab('simulador',this)">🎯 Simulador</button>
   </div>
   <div id="pft-resumen" class="pft"></div>
   <div id="pft-presupuesto" class="pft" style="display:none"></div>
   <div id="pft-gastos" class="pft" style="display:none"></div>
   <div id="pft-integracion" class="pft" style="display:none"></div>
   <div id="pft-deudas" class="pft" style="display:none"></div>
-  <div id="pft-simulador" class="pft" style="display:none"></div>
 </div>
 
 <!-- ══ MODAL GASTO DIARIO ══ -->
@@ -831,7 +829,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.04.4';
+var APP_VERSION='2026.07.04.5';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -2137,57 +2135,93 @@ function renderCalendarioIngresos(proyAnye){
     return;
   }
 
-  // Timeline mes a mes, desde el mes actual hasta el último evento
-  var hoy=new Date();var inicio=new Date(hoy.getFullYear(),hoy.getMonth(),1);
-  var fin=eventos[eventos.length-1].fecha;
-  var meses=(fin.getFullYear()-inicio.getFullYear())*12+(fin.getMonth()-inicio.getMonth())+1;
-  meses=Math.max(meses,1);
-  var maxMonto=Math.max.apply(null,eventos.map(function(e){return e.monto;}));
-  var NOMBRES_MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'];
+  // Guardamos los eventos para poder repintar el calendario al cambiar de año
+  // sin recalcular toda Mi Vista.
+  MV_CAL_EVENTOS=eventos;
+  // Rango navegable: del año actual (o el primer evento si es anterior) hasta
+  // 3 años después del último evento (para ver cosechas futuras).
+  var hoyY=new Date().getFullYear();
+  MV_CAL_MIN=Math.min(hoyY,eventos[0].fecha.getFullYear());
+  MV_CAL_MAX=eventos[eventos.length-1].fecha.getFullYear()+3;
+  // Al entrar, arrancar en el año del primer ingreso esperado.
+  if(MV_CAL_YEAR===null||MV_CAL_YEAR<MV_CAL_MIN||MV_CAL_YEAR>MV_CAL_MAX)MV_CAL_YEAR=eventos[0].fecha.getFullYear();
+  pintarCalendarioAnio();
+}
 
-  var h='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px">';
-  for(var i=0;i<meses;i++){
-    var mFecha=new Date(inicio.getFullYear(),inicio.getMonth()+i,1);
-    var evsMes=eventos.filter(function(e){return e.fecha.getFullYear()===mFecha.getFullYear()&&e.fecha.getMonth()===mFecha.getMonth();});
+var MV_CAL_EVENTOS=[];var MV_CAL_YEAR=null;var MV_CAL_MIN=0;var MV_CAL_MAX=0;
+var NOMBRES_MES_CAL=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'];
+// Cambia el año mostrado en el calendario de ingresos (flechas ‹ ›).
+function cambiarAnioCalendario(delta){
+  var nuevo=MV_CAL_YEAR+delta;
+  if(nuevo<MV_CAL_MIN||nuevo>MV_CAL_MAX)return;
+  MV_CAL_YEAR=nuevo;
+  pintarCalendarioAnio();
+}
+// Pinta el calendario del año MV_CAL_YEAR: navegación + grid de 12 meses + lista.
+function pintarCalendarioAnio(){
+  var elCal=document.getElementById('mv-calendario');
+  var elAnual=document.getElementById('mv-anual');
+  if(!elCal||!elAnual)return;
+  var eventos=MV_CAL_EVENTOS;
+  var maxMonto=Math.max.apply(null,eventos.map(function(e){return e.monto;}));
+  var eventosAnio=eventos.filter(function(e){return e.fecha.getFullYear()===MV_CAL_YEAR;});
+  var totalAnio=eventosAnio.reduce(function(s,e){return s+e.monto;},0);
+
+  // Barra de navegación de año
+  var puedeAtras=MV_CAL_YEAR>MV_CAL_MIN, puedeAdelante=MV_CAL_YEAR<MV_CAL_MAX;
+  var h='<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:14px">';
+  h+='<button onclick="cambiarAnioCalendario(-1)" '+(puedeAtras?'':'disabled')+' style="background:var(--fog);border:1px solid var(--border);border-radius:8px;width:32px;height:32px;font-size:15px;cursor:'+(puedeAtras?'pointer':'not-allowed')+';color:'+(puedeAtras?'var(--leaf)':'var(--ink4)')+';font-weight:800;opacity:'+(puedeAtras?'1':'.4')+'">‹</button>';
+  h+='<div style="font-size:16px;font-weight:800;color:var(--forest);min-width:70px;text-align:center">'+MV_CAL_YEAR+'</div>';
+  h+='<button onclick="cambiarAnioCalendario(1)" '+(puedeAdelante?'':'disabled')+' style="background:var(--fog);border:1px solid var(--border);border-radius:8px;width:32px;height:32px;font-size:15px;cursor:'+(puedeAdelante?'pointer':'not-allowed')+';color:'+(puedeAdelante?'var(--leaf)':'var(--ink4)')+';font-weight:800;opacity:'+(puedeAdelante?'1':'.4')+'">›</button>';
+  h+='</div>';
+
+  // Grid de 12 meses del año
+  h+='<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">';
+  for(var m=0;m<12;m++){
+    var evsMes=eventos.filter(function(e){return e.fecha.getFullYear()===MV_CAL_YEAR&&e.fecha.getMonth()===m;});
     var totalMes=evsMes.reduce(function(s,e){return s+e.monto;},0);
-    var alturaBarra=totalMes>0?Math.max(18,Math.round((totalMes/maxMonto)*70)):0;
-    h+='<div style="flex:0 0 62px;text-align:center">';
-    h+='<div style="height:74px;display:flex;align-items:flex-end;justify-content:center">';
-    if(totalMes>0){
-      h+='<div title="'+evsMes.map(function(e){return e.nombre+': $'+Math.round(e.monto).toLocaleString('es-CR');}).join(' · ')+'" style="width:28px;height:'+alturaBarra+'px;background:var(--c-anyelo);border-radius:4px 4px 0 0"></div>';
-    }
+    var alturaBarra=totalMes>0?Math.max(18,Math.round((totalMes/maxMonto)*54)):0;
+    h+='<div style="text-align:center">';
+    h+='<div style="height:58px;display:flex;align-items:flex-end;justify-content:center">';
+    if(totalMes>0)h+='<div title="'+evsMes.map(function(e){return e.nombre+': $'+Math.round(e.monto).toLocaleString('es-CR');}).join(' · ')+'" style="width:22px;height:'+alturaBarra+'px;background:var(--c-anyelo);border-radius:4px 4px 0 0"></div>';
     h+='</div>';
-    h+='<div style="font-size:9px;color:var(--ink4);margin-top:4px;font-weight:'+(totalMes>0?'700':'400')+';color:'+(totalMes>0?'var(--c-anyelo)':'var(--ink4)')+'">'+NOMBRES_MES[mFecha.getMonth()]+'<br>'+mFecha.getFullYear()+'</div>';
-    if(totalMes>0)h+='<div style="font-size:9px;font-weight:800;color:var(--c-anyelo);margin-top:2px">$'+Math.round(totalMes).toLocaleString('es-CR')+'</div>';
+    h+='<div style="font-size:9px;margin-top:3px;font-weight:'+(totalMes>0?'700':'400')+';color:'+(totalMes>0?'var(--c-anyelo)':'var(--ink4)')+'">'+NOMBRES_MES_CAL[m]+'</div>';
+    if(totalMes>0)h+='<div style="font-size:8.5px;font-weight:800;color:var(--c-anyelo)">$'+Math.round(totalMes).toLocaleString('es-CR')+'</div>';
     h+='</div>';
   }
   h+='</div>';
-  h+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">';
-  eventos.forEach(function(e){
-    h+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px">';
-    h+='<span style="color:var(--ink2)">'+e.nombre+' <span style="color:var(--ink4);font-size:10px">· '+NOMBRES_MES[e.fecha.getMonth()]+' '+e.fecha.getFullYear()+'</span></span>';
-    h+='<span style="font-weight:700;color:var(--c-anyelo);font-family:JetBrains Mono,monospace">$'+Math.round(e.monto).toLocaleString('es-CR')+'</span>';
-    h+='</div>';
-  });
-  h+='<div style="font-size:10px;color:var(--ink4);margin-top:8px">⚠ Estos montos NO son fijos: se recalculan al instante con los precios, rendimiento y mortalidad del simulador (pestaña Portafolio) — si los ajustás, este calendario cambia solo. La fecha es estimada según el ciclo de siembra. La piña se paga el mismo día o al día siguiente de cosechar, no en cuotas.</div>';
+
+  // Lista de eventos del año + total del año
+  h+='<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">';
+  if(eventosAnio.length){
+    eventosAnio.forEach(function(e){
+      h+='<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px">';
+      h+='<span style="color:var(--ink2)">'+e.nombre+' <span style="color:var(--ink4);font-size:10px">· '+NOMBRES_MES_CAL[e.fecha.getMonth()]+' '+MV_CAL_YEAR+'</span></span>';
+      h+='<span style="font-weight:700;color:var(--c-anyelo);font-family:JetBrains Mono,monospace">$'+Math.round(e.monto).toLocaleString('es-CR')+'</span></div>';
+    });
+    h+='<div style="display:flex;justify-content:space-between;padding:6px 0 2px;font-size:12px;font-weight:800;border-top:1px solid var(--border);margin-top:4px">';
+    h+='<span>Total '+MV_CAL_YEAR+'</span><span style="color:var(--c-anyelo);font-family:JetBrains Mono,monospace">$'+Math.round(totalAnio).toLocaleString('es-CR')+'</span></div>';
+  } else {
+    h+='<div style="text-align:center;color:var(--ink4);font-size:11px;padding:6px 0">Sin ingresos estimados en '+MV_CAL_YEAR+' — usá ‹ › para ver otros años.</div>';
+  }
+  h+='<div style="font-size:10px;color:var(--ink4);margin-top:8px">⚠ Estos montos NO son fijos: se recalculan al instante con los precios, rendimiento y mortalidad del simulador de precios (pestaña Portafolio) — si los ajustás, este calendario cambia solo. La fecha es estimada según el ciclo de siembra.</div>';
   h+='</div>';
   elCal.innerHTML=h;
 
-  // Resumen por año calendario
+  // Resumen por año calendario (todos los años, para ver el panorama completo)
   var porAnio={};
   eventos.forEach(function(e){var y=e.fecha.getFullYear();porAnio[y]=(porAnio[y]||0)+e.monto;});
   var anios=Object.keys(porAnio).sort();
   var hA='<div style="display:grid;grid-template-columns:repeat('+Math.min(anios.length,4)+',1fr);gap:11px">';
   anios.forEach(function(y){
-    hA+='<div style="background:var(--fog);border-radius:8px;padding:12px;text-align:center">';
+    var activo=String(y)===String(MV_CAL_YEAR);
+    hA+='<div onclick="MV_CAL_YEAR='+y+';pintarCalendarioAnio()" style="background:'+(activo?'#f0eeff':'var(--fog)')+';border:'+(activo?'1px solid #c8b8ff':'1px solid transparent')+';border-radius:8px;padding:12px;text-align:center;cursor:pointer">';
     hA+='<div style="font-size:20px;font-weight:800;color:var(--c-anyelo)">$'+Math.round(porAnio[y]).toLocaleString('es-CR')+'</div>';
-    hA+='<div style="font-size:11px;color:var(--ink4);margin-top:2px">'+y+'</div>';
-    hA+='</div>';
+    hA+='<div style="font-size:11px;color:var(--ink4);margin-top:2px">'+y+'</div></div>';
   });
   hA+='</div>';
   elAnual.innerHTML=hA;
 }
-
 function renderCruce(proyAnye){
   var salario=(APP.personal&&APP.personal.salarioBruto)?APP.personal.salarioBruto:0;
   var totalAnualProy=proyAnye.reduce(function(s,x){
@@ -2416,13 +2450,21 @@ function initPersonal(){
   if(!APP.personal.nextGastoId)APP.personal.nextGastoId=1;
   if(!APP.personal.nextCatId)APP.personal.nextCatId=(APP.personal.categorias||[]).length+1;
   if(!APP.personal.nextDeudaId)APP.personal.nextDeudaId=7;
+  // Salario de Arbolus (~$2,000 netos/mes) como valor por defecto. Se aplica una
+  // sola vez (flag salarioInicializado) y solo si nunca se configuró un salario
+  // — si Anyelo lo edita a otro valor, se respeta y no se vuelve a pisar.
+  if(!APP.personal.salarioInicializado&&!APP.personal.salarioBruto&&!APP.personal.salarioNeto){
+    APP.personal.salarioBruto=2000;
+    APP.personal.salarioNeto=2000;
+  }
+  APP.personal.salarioInicializado=true;
   saveL();
 }
 
 function buildDefaultPersonal(){
-  // Valores en BLANCO por defecto (privacidad). Solo aplica a una instalacion
-  // nueva; los datos reales de Anyelo viven en SU dispositivo y no se tocan.
-  return{salarioBruto:0,salarioNeto:0,tc:520,nextCatId:1,nextGastoId:1,nextDeudaId:1,
+  // Salario de Arbolus de Anyelo (~$2,000 netos/mes) por defecto. Editable desde
+  // el modal de salario. tc a 500 (tipo de cambio de referencia actual).
+  return{salarioBruto:2000,salarioNeto:2000,salarioInicializado:true,tc:500,nextCatId:1,nextGastoId:1,nextDeudaId:1,
     categorias:[],
     gastosPersonales:[],
     deudas:[]};
@@ -2522,7 +2564,6 @@ function pfTab(id,btn){
   else if(id==='gastos')renderPFGastos();
   else if(id==='integracion')renderPFIntegracion();
   else if(id==='deudas')renderPFDeudas();
-  else if(id==='simulador')renderSimulador();
 }
 
 function renderMisFinanzas(){
@@ -2551,7 +2592,6 @@ function renderMisFinanzas(){
   else if(PF_TAB==='gastos')renderPFGastos();
   else if(PF_TAB==='integracion')renderPFIntegracion();
   else if(PF_TAB==='deudas')renderPFDeudas();
-  else if(PF_TAB==='simulador')renderSimulador();
 }
 
 // ── RESUMEN ──
@@ -2792,48 +2832,6 @@ function renderPFDeudas(){
     h+='</div></div>';
   }
   document.getElementById('pft-deudas').innerHTML=h;
-}
-
-// ── SIMULADOR ──
-function renderSimulador(){
-  initPersonal();
-  var el=document.getElementById('pft-simulador');if(!el)return;
-  var p=APP.personal,neto=p.salarioNeto||0,mc=calcMargen();
-  var coo=p.deudas?p.deudas.find(function(d){return d.nombre.toLowerCase().includes('coopenae');}):null;
-  var cooUSD=coo?toUSD(coo.cuota,coo.moneda):0;
-  // Read from inputs if they exist, else use defaults
-  var simDiv=document.getElementById('sim-inputs');
-  var monto=51000,pctVos=33,tasa=12.25,plazo=106;
-  if(simDiv){
-    monto=parseFloat(document.getElementById('sim-monto').value)||51000;
-    pctVos=parseFloat(document.getElementById('sim-pct-vos').value)||33;
-    tasa=parseFloat(document.getElementById('sim-tasa').value)||12.25;
-    plazo=parseInt(document.getElementById('sim-plazo').value)||106;
-  }
-  var r=(tasa/100)/12;
-  var cuotaT=monto*(r*Math.pow(1+r,plazo))/(Math.pow(1+r,plazo)-1);
-  var tuCuota=cuotaT*(pctVos/100),papaCuota=cuotaT-tuCuota;
-  var margenNuevo=mc.libre-tuCuota+cooUSD;
-  var servT=mc.deu-cooUSD+tuCuota,pctSal=Math.round((servT/neto)*100);
-  var colN=margenNuevo>200?'var(--leaf2)':margenNuevo>0?'var(--sun)':'var(--red)';
-  var alertaT=pctSal>35?'\uD83D\uDD34 Supera el 35% recomendado':pctSal>25?'\uD83D\uDFE1 Zona de alerta':'\u2705 Dentro del rango saludable';
-  var h='<div class="card"><div class="ch"><div class="ct">Simulador de nuevo pr\u00E9stamo</div><div class="ctag">impacto en margen real</div></div><div class="cb">';
-  h+='<div id="sim-inputs" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'+
-    '<div class="field"><label>Monto total ($)</label><input type="number" id="sim-monto" class="fi" value="'+monto+'" oninput="renderSimulador()"></div>'+
-    '<div class="field"><label>Tu % del pr\u00E9stamo</label><input type="number" id="sim-pct-vos" class="fi" value="'+pctVos+'" min="10" max="100" oninput="renderSimulador()"></div>'+
-    '<div class="field"><label>Tasa nominal anual %</label><input type="number" id="sim-tasa" class="fi" value="'+tasa+'" step="0.25" oninput="renderSimulador()"></div>'+
-    '<div class="field"><label>Plazo (meses)</label><input type="number" id="sim-plazo" class="fi" value="'+plazo+'" oninput="renderSimulador()"></div>'+
-  '</div>';
-  h+='<div class="sim-result">'+
-    '<div class="sim-row"><span>Cuota total del pr\u00E9stamo</span><span style="font-family:JetBrains Mono,monospace;font-weight:700">$'+Math.round(cuotaT)+'/mes</span></div>'+
-    '<div class="sim-row"><span>Tu cuota ('+Math.round(pctVos)+'%)</span><span style="font-family:JetBrains Mono,monospace;font-weight:800;color:var(--c-anyelo)">$'+Math.round(tuCuota)+'/mes</span></div>'+
-    '<div class="sim-row"><span>Cuota pap\u00E1 ('+Math.round(100-pctVos)+'%)</span><span style="font-family:JetBrains Mono,monospace;font-weight:700;color:var(--c-jonathan)">$'+Math.round(papaCuota)+'/mes</span></div>'+
-    (cooUSD>0?'<div class="sim-row" style="border-top:1px dashed var(--border);margin-top:4px"><span style="font-size:11px;color:var(--leaf)">Si se absorbe un préstamo</span><span style="font-size:11px;color:var(--leaf);font-weight:600">+$'+Math.round(cooUSD)+' libera</span></div>':'')+
-    '<div class="sim-row" style="border-top:2px solid var(--border);margin-top:6px"><span style="font-weight:700">Margen libre resultante</span><span style="font-family:JetBrains Mono,monospace;font-weight:800;color:'+colN+'">$'+Math.round(margenNuevo)+'/mes</span></div>'+
-    '<div class="sim-row"><span>Deuda / salario neto</span><span style="font-weight:700;color:'+(pctSal>35?'var(--red)':'var(--leaf)')+'">'+pctSal+'%</span></div>'+
-    '<div style="margin-top:10px;padding:9px;background:var(--fog);border-radius:6px;font-size:11px;color:var(--ink3)">'+alertaT+' \u00B7 Regla sana: deuda \u2264 35% del salario neto</div>'+
-  '</div></div>';
-  el.innerHTML=h;
 }
 
 // ── CRUD GASTOS DIARIOS ──
