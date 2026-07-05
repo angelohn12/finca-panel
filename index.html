@@ -583,6 +583,18 @@ nav>*{position:relative;z-index:1;}
         <select id="np-ciclo" class="fi"><option value="PC">PC · Primera Cosecha</option><option value="SC">SC · Segunda Cosecha</option><option value="TC">TC · Tercera Cosecha</option><option value="Otro">Otro</option></select>
       </div>
     </div>
+    <div class="field" style="margin-bottom:14px;background:var(--fog);border:1px dashed var(--border);border-radius:8px;padding:10px">
+      <label>Precargar costo con un modelo (según hectáreas de arriba)</label>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap">
+        <select id="np-modelo-costo" class="fi" style="flex:1;min-width:160px">
+          <option value="">— elegir modelo —</option>
+          <option value="premium">Premium · ~$20,000/ha (65k plantas/ha, exportación — solo total, sin desglose)</option>
+          <option value="economico">Económico · ~$16,752/ha (55k plantas/ha, fruta grande, mercado nacional — con desglose)</option>
+        </select>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="precargarModeloCosto()">Precargar</button>
+      </div>
+      <div style="font-size:10px;color:var(--ink4);margin-top:5px">Completa Inversión y el presupuesto por categoría (pestaña Finanzas) — siempre editable después.</div>
+    </div>
     <div class="field" style="margin-bottom:14px">
       <label>Color del proyecto</label>
       <div class="color-pick" id="color-pick"></div>
@@ -829,7 +841,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.04.5';
+var APP_VERSION='2026.07.05.1';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1203,8 +1215,40 @@ function stringToColor(str){
 }
 
 // ── ABRIR MODAL PROYECTO ──
+// Costo por hectárea del modelo "económico" (mercado nacional, fruta grande,
+// 55k plantas/ha) — desglose real dado por Jonathan, en USD/ha (tipo de cambio
+// ₡460/$ del dato original). Total: $16,752/ha.
+var COSTOS_HA_ECONOMICO={
+  'Alquiler terreno':707,'Preparación terreno':1970,
+  'Compra semilla + Siembra Integral':2391+1793,
+  'Aplicaciones Paquete Técnico':2283+400+400+800+800,
+  'Mantenimiento Finca + Boom':1087+522,
+  'Cosecha':3000+600
+};
+var COSTO_HA_PREMIUM=20000; // solo el total real (Corona 3: $30,000/1.5ha) — sin desglose por categoría
+function precargarModeloCosto(){
+  var modelo=document.getElementById('np-modelo-costo').value;
+  var ha=parseFloat(document.getElementById('np-ha').value)||1.5;
+  if(!modelo){toast('⚠ Elegí un modelo primero',true);return;}
+  if(modelo==='premium'){
+    document.getElementById('np-inv').value=Math.round(COSTO_HA_PREMIUM*ha);
+    NP_PRESUPUESTO_PRECARGADO=null; // sin desglose conocido — se usa PRESUP_DEFAULT normal
+    toast('✅ Inversión precargada ($'+COSTO_HA_PREMIUM+'/ha × '+ha+'ha). Sin desglose por categoría para este modelo.');
+  } else {
+    var total=0,pres={};
+    Object.keys(COSTOS_HA_ECONOMICO).forEach(function(cat){
+      var v=Math.round(COSTOS_HA_ECONOMICO[cat]*ha);
+      pres[cat]=v;total+=v;
+    });
+    document.getElementById('np-inv').value=total;
+    NP_PRESUPUESTO_PRECARGADO=pres;
+    toast('✅ Inversión y presupuesto por categoría precargados ($'+Math.round(total/ha).toLocaleString('es-CR')+'/ha × '+ha+'ha)');
+  }
+}
+var NP_PRESUPUESTO_PRECARGADO=null;
 function abrirNuevoProyecto(){
   editandoProjId=null;
+  NP_PRESUPUESTO_PRECARGADO=null;
   document.getElementById('modal-proj-title').textContent='+ Nuevo proyecto';
   document.getElementById('np-nombre').value='';
   document.getElementById('np-cultivo').value='Piña MD2 Extra Sweet';
@@ -1213,6 +1257,7 @@ function abrirNuevoProyecto(){
   document.getElementById('np-inv').value='';
   document.getElementById('np-ciclo').value='PC';
   document.getElementById('np-siembra').value='';
+  document.getElementById('np-modelo-costo').value='';
   colorSeleccionado=COLORES[APP.proyectos.length%COLORES.length];
   buildColorPick();
   document.getElementById('socios-rows').innerHTML='';
@@ -1285,7 +1330,11 @@ function guardarProyecto(){
       else{toast('⚠ Ese proyecto ya no existe en Sheets (¿lo borró el otro usuario?)',true);cerrarModal('modal-proj');renderPortafolio();return;}
     } else {
       var precios=JSON.parse(JSON.stringify(PRECIOS_BASE));
-      APP.proyectos.push({id:APP.nextProjId++,nombre:nombre,cultivo:cultivo,ha:ha,plantas:plantas,inv:inv,ciclo:ciclo,siembra:siembra,socios:socios,color:colorSeleccionado,precios:precios,rend:100,mort:5,activo:true,presupuesto:JSON.parse(JSON.stringify(PRESUP_DEFAULT))});
+      // Si se precargó un modelo de costo con desglose (económico), usarlo;
+      // si no, el default de siempre (premium no trae desglose, solo total).
+      var presupInicial=NP_PRESUPUESTO_PRECARGADO||JSON.parse(JSON.stringify(PRESUP_DEFAULT));
+      APP.proyectos.push({id:APP.nextProjId++,nombre:nombre,cultivo:cultivo,ha:ha,plantas:plantas,inv:inv,ciclo:ciclo,siembra:siembra,socios:socios,color:colorSeleccionado,precios:precios,rend:100,mort:5,activo:true,presupuesto:presupInicial});
+      NP_PRESUPUESTO_PRECARGADO=null;
     }
     saveL();
     cerrarModal('modal-proj');
@@ -1462,6 +1511,7 @@ function editarProyecto(pid){
   var p=APP.proyectos.find(function(x){return x.id===pid;});
   if(!p)return;
   editandoProjId=pid;
+  NP_PRESUPUESTO_PRECARGADO=null; // editar proyecto no usa el precargado (guardarProyecto solo lo aplica al crear)
   document.getElementById('modal-proj-title').textContent='✎ Editar proyecto';
   document.getElementById('np-nombre').value=p.nombre;
   document.getElementById('np-cultivo').value=p.cultivo||'Piña MD2 Extra Sweet';
