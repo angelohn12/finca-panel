@@ -926,7 +926,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.06.2';
+var APP_VERSION='2026.07.06.3';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -2505,17 +2505,21 @@ function initMapa(){
     return;
   }
   if(!APP.lotes)APP.lotes=[];
-  MAPA=L.map('mapa-leaflet',{center:MAPA_CENTRO,zoom:MAPA_ZOOM,zoomControl:true});
+  // maxZoom 20 = se puede acercar mucho (para dibujar preciso). maxNativeZoom =
+  // hasta qué nivel Esri tiene fotos reales en esta zona rural; más allá, Leaflet
+  // ESCALA la última foto disponible (se ve algo pixelada pero SIEMPRE se ve,
+  // nunca "Map data not yet available").
+  MAPA=L.map('mapa-leaflet',{center:MAPA_CENTRO,zoom:MAPA_ZOOM,zoomControl:true,maxZoom:20});
   // Tres capas base, todas de Esri (gratis, sin API-key). El usuario alterna
   // entre ellas con el selector "Vista" para ubicarse mejor:
   //  - satelital: solo la foto satelital
   //  - hibrido: satelital + carreteras/etiquetas encima (lo mejor para orientarse)
   //  - calles: mapa de calles clásico (como un mapa de rutas)
-  var esriSat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imágenes: Esri'});
-  var esriCalles=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri'});
+  var esriSat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:17,attribution:'Imágenes: Esri'});
+  var esriCalles=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,attribution:'Esri'});
   // Overlays que se ponen ENCIMA del satélite en modo híbrido: carreteras + nombres.
-  var esriCarreteras=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
-  var esriLugares=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+  var esriCarreteras=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:18});
+  var esriLugares=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:16});
   MAPA_BASES={satelital:esriSat,calles:esriCalles};
   MAPA_OVERLAYS={carreteras:esriCarreteras,lugares:esriLugares};
   mapaAplicarVista('hibrido'); // arranca en híbrido: satélite + carreteras (lo más útil para orientarse)
