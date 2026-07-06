@@ -587,12 +587,22 @@ nav>*{position:relative;z-index:1;}
   <div class="card" style="overflow:hidden">
     <div class="ch">
       <div class="ct">Lotes de la finca</div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        <span style="font-size:10px;color:var(--ink4)">Pintar por:</span>
-        <select id="mapa-color-modo" class="fi" style="font-size:11px;padding:3px 8px;width:auto" onchange="mapaRepintar()">
-          <option value="proyecto">Proyecto</option>
-          <option value="estado">Estado del ciclo</option>
-        </select>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:5px;align-items:center">
+          <span style="font-size:10px;color:var(--ink4)">Vista:</span>
+          <select id="mapa-vista" class="fi" style="font-size:11px;padding:3px 8px;width:auto" onchange="mapaAplicarVista(this.value)">
+            <option value="hibrido">Satélite + carreteras</option>
+            <option value="satelital">Solo satélite</option>
+            <option value="calles">Calles (rutas)</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center">
+          <span style="font-size:10px;color:var(--ink4)">Pintar por:</span>
+          <select id="mapa-color-modo" class="fi" style="font-size:11px;padding:3px 8px;width:auto" onchange="mapaRepintar()">
+            <option value="proyecto">Proyecto</option>
+            <option value="estado">Estado del ciclo</option>
+          </select>
+        </div>
       </div>
     </div>
     <div id="mapa-contenedor" style="height:520px;position:relative;background:var(--fog)">
@@ -916,7 +926,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.06.1';
+var APP_VERSION='2026.07.06.2';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -2458,6 +2468,25 @@ function syncTxASheet(tx){
    datos (cosecha, ingreso estimado) al tocarlo. */
 var MAPA=null;               // instancia Leaflet (se crea una sola vez)
 var MAPA_CAPAS={};           // id de lote -> capa (polígono) en el mapa
+var MAPA_BASES={};           // capas base (satelital / calles)
+var MAPA_OVERLAYS={};        // capas encima (carreteras / lugares) para el modo híbrido
+// Cambia la vista del mapa: 'satelital', 'hibrido' (satélite+carreteras) o 'calles'.
+function mapaAplicarVista(vista){
+  if(!MAPA)return;
+  Object.keys(MAPA_BASES).forEach(function(k){MAPA.removeLayer(MAPA_BASES[k]);});
+  Object.keys(MAPA_OVERLAYS).forEach(function(k){MAPA.removeLayer(MAPA_OVERLAYS[k]);});
+  if(vista==='calles'){
+    MAPA_BASES.calles.addTo(MAPA);
+  } else {
+    MAPA_BASES.satelital.addTo(MAPA);
+    if(vista==='hibrido'){ // carreteras + nombres encima del satélite
+      MAPA_OVERLAYS.carreteras.addTo(MAPA);
+      MAPA_OVERLAYS.lugares.addTo(MAPA);
+    }
+  }
+  // Los polígonos de lotes deben quedar por encima de las capas base.
+  Object.keys(MAPA_CAPAS).forEach(function(id){if(MAPA_CAPAS[id].bringToFront)MAPA_CAPAS[id].bringToFront();});
+}
 var MAPA_DRAWER=null;        // control de dibujo activo
 var LOTE_EDITANDO=null;      // id del lote abierto en el modal
 var LOTE_NUEVA_GEO=null;     // geometría recién dibujada, aún sin guardar
@@ -2477,14 +2506,19 @@ function initMapa(){
   }
   if(!APP.lotes)APP.lotes=[];
   MAPA=L.map('mapa-leaflet',{center:MAPA_CENTRO,zoom:MAPA_ZOOM,zoomControl:true});
-  // Capa satelital de Esri (World Imagery) — gratis, sin API-key.
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
-    maxZoom:19,attribution:'Imágenes: Esri'
-  }).addTo(MAPA);
-  // Etiquetas de lugares encima (para orientarse), semi-transparentes.
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{
-    maxZoom:19,opacity:0.7
-  }).addTo(MAPA);
+  // Tres capas base, todas de Esri (gratis, sin API-key). El usuario alterna
+  // entre ellas con el selector "Vista" para ubicarse mejor:
+  //  - satelital: solo la foto satelital
+  //  - hibrido: satelital + carreteras/etiquetas encima (lo mejor para orientarse)
+  //  - calles: mapa de calles clásico (como un mapa de rutas)
+  var esriSat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imágenes: Esri'});
+  var esriCalles=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri'});
+  // Overlays que se ponen ENCIMA del satélite en modo híbrido: carreteras + nombres.
+  var esriCarreteras=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+  var esriLugares=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+  MAPA_BASES={satelital:esriSat,calles:esriCalles};
+  MAPA_OVERLAYS={carreteras:esriCarreteras,lugares:esriLugares};
+  mapaAplicarVista('hibrido'); // arranca en híbrido: satélite + carreteras (lo más útil para orientarse)
   document.getElementById('mapa-cargando').style.display='none';
   // Al terminar de dibujar un polígono, abrir el modal para nombrarlo.
   if(L.Draw&&L.Draw.Event)MAPA.on(L.Draw.Event.CREATED,mapaOnCreado);
