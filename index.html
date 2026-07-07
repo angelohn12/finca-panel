@@ -582,6 +582,10 @@ nav>*{position:relative;z-index:1;}
     <div><div class="pt">Mapa de la finca</div><div class="ps">Dibujá tus lotes sobre el mapa satelital · tocá un lote para ver sus datos</div></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap">
       <button class="btn btn-primary" id="mapa-btn-dibujar" onclick="mapaModoDibujo()">✎ Dibujar lote</button>
+      <div id="mapa-acciones-forma" style="display:none;gap:7px">
+        <button class="btn btn-primary" onclick="mapaGuardarForma()">💾 Guardar forma</button>
+        <button class="btn btn-ghost" onclick="mapaCancelarEdicionForma()">✕ Cancelar</button>
+      </div>
     </div>
   </div>
   <div class="card" style="overflow:hidden">
@@ -926,7 +930,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.06.3';
+var APP_VERSION='2026.07.06.4';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -2550,23 +2554,70 @@ function colorDeLote(l){
   return '#1a5c2e';
 }
 
+// Un lote es visible para el usuario actual si: no está vinculado a ningún
+// proyecto (referencia general, lo ve cualquiera), o si está vinculado a un
+// proyecto donde el usuario actual es socio. Mismo criterio de personalización
+// que ya usan Portafolio y Mi Vista (socioUsuarioActual) — así Jonathan ve sus
+// lotes/proyectos y Anyelo ve los suyos, no todo mezclado.
+function loteVisibleParaMi(l){
+  if(!l.projId)return true;
+  var p=APP.proyectos.find(function(x){return x.id===l.projId;});
+  if(!p)return true; // proyecto borrado/no encontrado: no ocultar, mejor mostrarlo
+  return !!socioUsuarioActual(p.socios);
+}
+function lotesMios(){return (APP.lotes||[]).filter(function(l){return l.geo&&l.geo.length&&loteVisibleParaMi(l);});}
+
 // Borra los polígonos del mapa y los vuelve a pintar desde APP.lotes.
 function mapaRepintar(){
   if(!MAPA)return;
   Object.keys(MAPA_CAPAS).forEach(function(id){MAPA.removeLayer(MAPA_CAPAS[id]);});
   MAPA_CAPAS={};
-  (APP.lotes||[]).forEach(function(l){
-    if(!l.geo||!l.geo.length)return;
+  lotesMios().forEach(function(l){
     var col=colorDeLote(l);
     var poly=L.polygon(l.geo,{color:'#fff',weight:2,fillColor:col,fillOpacity:0.55});
     poly.addTo(MAPA);
     poly.bindTooltip(l.nombre,{permanent:true,direction:'center',className:'lote-tooltip'});
-    poly.on('click',function(){abrirModalLote(l.id);});
+    poly.bindPopup(popupDatosLote(l.id),{maxWidth:260});
     MAPA_CAPAS[l.id]=poly;
   });
-  var n=(APP.lotes||[]).filter(function(l){return l.geo&&l.geo.length;}).length;
+  var n=lotesMios().length;
   document.getElementById('mapa-contador').textContent=n+' lote'+(n===1?'':'s')+' en el mapa';
   renderListaLotes();
+}
+
+// Arma el HTML del popup que aparece al tocar un lote: datos del proyecto
+// vinculado (inversión, plantas, ganancia — misma cuenta que Portafolio) más
+// un link para editar el lote (nombre/estado/proyecto) o su forma en el mapa.
+function popupDatosLote(id){
+  var l=(APP.lotes||[]).find(function(x){return x.id===id;});
+  if(!l)return '';
+  var estadoTxt=l.estado==='preparacion'?'En preparación':l.estado==='futuro'?'Futuro / sin sembrar':'Sembrado';
+  var h='<div style="font-family:Plus Jakarta Sans,sans-serif;min-width:180px">';
+  h+='<div style="font-size:13px;font-weight:800;color:var(--forest);margin-bottom:2px">'+l.nombre+'</div>';
+  h+='<div style="font-size:11px;color:var(--ink4);margin-bottom:8px">'+estadoTxt+(l.area?' · '+l.area+' ha':'')+'</div>';
+  if(l.projId){
+    var p=APP.proyectos.find(function(x){return x.id===l.projId;});
+    if(p){
+      var plantasTot=Math.round((p.plantas||65000)*p.ha);
+      var gan=calcGanancia(p);
+      var s=socioUsuarioActual(p.socios);
+      var tuParte=s?Math.max(0,gan*(s.pctGanancia/100)):null;
+      h+='<div style="font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:4px">🌿 '+p.nombre+'</div>';
+      h+='<table style="font-size:11px;width:100%;border-collapse:collapse">';
+      h+='<tr><td style="color:var(--ink4);padding:2px 0">Plantas</td><td style="text-align:right;font-weight:700">'+plantasTot.toLocaleString('es-CR')+'</td></tr>';
+      h+='<tr><td style="color:var(--ink4);padding:2px 0">Inversión</td><td style="text-align:right;font-weight:700">$'+Math.round(p.inv).toLocaleString('es-CR')+'</td></tr>';
+      h+='<tr><td style="color:var(--ink4);padding:2px 0">Ganancia proy.</td><td style="text-align:right;font-weight:700;color:var(--leaf)">$'+Math.round(gan).toLocaleString('es-CR')+'</td></tr>';
+      if(tuParte!==null)h+='<tr><td style="color:var(--ink4);padding:2px 0">Tu parte</td><td style="text-align:right;font-weight:800;color:var(--c-anyelo)">$'+Math.round(tuParte).toLocaleString('es-CR')+'</td></tr>';
+      h+='</table>';
+    }
+  } else {
+    h+='<div style="font-size:11px;color:var(--ink4)">Sin proyecto vinculado</div>';
+  }
+  h+='<div style="display:flex;gap:6px;margin-top:8px;border-top:1px solid var(--border);padding-top:8px">';
+  h+='<button onclick="abrirModalLote('+id+')" style="flex:1;background:var(--fog);border:1px solid var(--border);color:var(--ink2);padding:5px;border-radius:6px;font-size:10.5px;cursor:pointer;font-weight:700">✎ Datos</button>';
+  h+='<button onclick="MAPA.closePopup();mapaEditarForma('+id+')" style="flex:1;background:var(--fog);border:1px solid var(--border);color:var(--ink2);padding:5px;border-radius:6px;font-size:10.5px;cursor:pointer;font-weight:700">◈ Forma</button>';
+  h+='</div></div>';
+  return h;
 }
 
 // Activa el modo dibujo: Anyelo toca el mapa para marcar las esquinas del lote.
@@ -2599,9 +2650,13 @@ function abrirModalLote(id){
   document.getElementById('ml-nombre').value=l?(l.nombre||''):('Lote '+String.fromCharCode(65+((APP.lotes||[]).length)));
   document.getElementById('ml-estado').value=l?(l.estado||'sembrado'):'sembrado';
   document.getElementById('ml-area').value=l&&l.area?l.area:'';
-  // Poblar select de proyectos
+  // Poblar select de proyectos — solo con los proyectos donde el usuario
+  // actual es socio (mismo filtro que el mapa), para que cada quien vincule
+  // sus propios lotes a sus propios proyectos, no a los del otro.
   var sel=document.getElementById('ml-proj');
-  sel.innerHTML='<option value="">— sin vincular —</option>'+APP.proyectos.map(function(p){
+  sel.innerHTML='<option value="">— sin vincular —</option>'+APP.proyectos.filter(function(p){
+    return !!socioUsuarioActual(p.socios);
+  }).map(function(p){
     return '<option value="'+p.id+'"'+((l&&l.projId===p.id)?' selected':'')+'>'+p.nombre+'</option>';
   }).join('');
   // Color picker
@@ -2654,6 +2709,44 @@ function eliminarLote(){
   toast('🗑 Lote eliminado');
 }
 
+// ── EDITAR LA FORMA de un lote ya dibujado (mover/agregar/quitar esquinas) ──
+// Leaflet.draw agrega capacidad de edición a todo L.polygon ya creado
+// (poly.editing), así que no hace falta volver a dibujar desde cero: se
+// habilitan los "handles" arrastrables sobre el polígono existente.
+var MAPA_EDITANDO_FORMA=null;
+function mapaEditarForma(id){
+  var poly=MAPA_CAPAS[id];
+  if(!poly||!poly.editing){toast('⚠ No se pudo editar este lote',true);return;}
+  MAPA_EDITANDO_FORMA=id;
+  poly.editing.enable();
+  document.getElementById('mapa-btn-dibujar').style.display='none';
+  document.getElementById('mapa-ayuda').innerHTML='<b>Editando forma:</b> arrastrá los puntos para ajustar el lote. ';
+  document.getElementById('mapa-acciones-forma').style.display='flex';
+}
+function mapaGuardarForma(){
+  if(!MAPA_EDITANDO_FORMA)return;
+  var poly=MAPA_CAPAS[MAPA_EDITANDO_FORMA];
+  var l=APP.lotes.find(function(x){return x.id===MAPA_EDITANDO_FORMA;});
+  if(poly&&l){
+    l.geo=poly.getLatLngs()[0].map(function(p){return [p.lat,p.lng];});
+    poly.editing.disable();
+    saveL();
+    guardarLotesEnSheet();
+    toast('✅ Forma del lote actualizada');
+  }
+  mapaCancelarEdicionForma();
+  mapaRepintar();
+}
+function mapaCancelarEdicionForma(){
+  if(MAPA_EDITANDO_FORMA&&MAPA_CAPAS[MAPA_EDITANDO_FORMA]&&MAPA_CAPAS[MAPA_EDITANDO_FORMA].editing){
+    MAPA_CAPAS[MAPA_EDITANDO_FORMA].editing.disable();
+  }
+  MAPA_EDITANDO_FORMA=null;
+  document.getElementById('mapa-btn-dibujar').style.display='';
+  document.getElementById('mapa-acciones-forma').style.display='none';
+  document.getElementById('mapa-ayuda').textContent='Navegá hasta tu finca (arrastrá y usá zoom), luego "✎ Dibujar lote" y tocá el mapa para marcar las esquinas.';
+}
+
 // Guarda TODOS los lotes como una fila JSON en Config (mismo patrón que calibres).
 function guardarLotesEnSheet(){
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
@@ -2673,7 +2766,7 @@ function construirFilasConfig(){
 function renderListaLotes(){
   var el=document.getElementById('mapa-lista-lotes');
   if(!el)return;
-  var lotes=(APP.lotes||[]).filter(function(l){return l.geo&&l.geo.length;});
+  var lotes=lotesMios();
   if(!lotes.length){el.innerHTML='';return;}
   var h='<div class="sec">Lotes dibujados</div><div class="g3">';
   lotes.forEach(function(l){
