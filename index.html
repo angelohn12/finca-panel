@@ -930,7 +930,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.06.4';
+var APP_VERSION='2026.07.06.5';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -2530,16 +2530,25 @@ function initMapa(){
   document.getElementById('mapa-cargando').style.display='none';
   // Al terminar de dibujar un polígono, abrir el modal para nombrarlo.
   if(L.Draw&&L.Draw.Event)MAPA.on(L.Draw.Event.CREATED,mapaOnCreado);
-  // Si ya hay lotes guardados, centrar el mapa en ellos.
-  mapaRepintar();
-  var conGeo=APP.lotes.filter(function(l){return l.geo&&l.geo.length;});
-  if(conGeo.length){
-    try{
-      var grupo=L.featureGroup(conGeo.map(function(l){return L.polygon(l.geo);}));
-      MAPA.fitBounds(grupo.getBounds().pad(0.3));
-    }catch(e){}
-  }
-  setTimeout(function(){MAPA.invalidateSize();},120);
+  // IMPORTANTE: la pestaña recién se hace visible (display:block) en el mismo
+  // instante en que se crea el mapa, así que el navegador todavía no calculó
+  // el tamaño real del contenedor. Si se llama fitBounds() antes de que
+  // Leaflet sepa el tamaño correcto, el encuadre sale mal (mapa "mundial" muy
+  // alejado, como pasó). Por eso: invalidateSize() PRIMERO (fuerza a Leaflet a
+  // releer el tamaño real), y recién después mapaRepintar()/fitBounds().
+  requestAnimationFrame(function(){
+    MAPA.invalidateSize();
+    mapaRepintar();
+    var conGeo=lotesMios();
+    if(conGeo.length){
+      try{
+        var grupo=L.featureGroup(conGeo.map(function(l){return L.polygon(l.geo);}));
+        MAPA.fitBounds(grupo.getBounds().pad(0.3));
+      }catch(e){}
+    }
+    // Segunda pasada de seguridad (algunos navegadores tardan un frame más).
+    setTimeout(function(){MAPA.invalidateSize();},150);
+  });
 }
 
 // Colorea un lote según el modo elegido (por proyecto = color del proyecto
