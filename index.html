@@ -862,9 +862,23 @@ nav>*{position:relative;z-index:1;}
   </div>
 
   <div class="card">
+    <div class="ch"><div class="ct">🤖 Preguntale al asistente</div><div class="ctag" id="chat-estado-tag">verificando…</div></div>
+    <div class="cb">
+      <div id="chat-mensajes" style="display:flex;flex-direction:column;gap:10px;max-height:340px;overflow-y:auto;margin-bottom:12px"></div>
+      <div id="chat-offline" style="display:none;font-size:12.5px;color:var(--ink4);background:var(--fog);border-radius:8px;padding:10px 12px;margin-bottom:12px">
+        El chat todavía no está conectado — falta configurar la conexión con Claude en el backend (Apps Script). Mientras tanto, seguí usando la guía de arriba y las sugerencias del formulario de Movimientos.
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="chat-input" class="fi" placeholder="Ej: ¿Cómo registro el préstamo de Coopealianza?" onkeydown="if(event.key==='Enter')enviarPreguntaContable()">
+        <button class="btn btn-primary" id="chat-btn-enviar" onclick="enviarPreguntaContable()">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="ch"><div class="ct">Sobre este asistente</div></div>
     <div class="cb" style="font-size:12.5px;line-height:1.6;color:var(--ink4)">
-      Esta guía y las sugerencias que aparecen al registrar un movimiento son una ayuda de referencia rápida, basada en reglas simples — no sustituyen el criterio del contador externo de JORISU. Ante dudas reales o montos importantes, siempre consultar con el contador.
+      Esta guía y las sugerencias que aparecen al registrar un movimiento son una ayuda de referencia rápida, basada en reglas simples — no sustituyen el criterio del contador externo de JORISU. Ante dudas reales o montos importantes, siempre consultar con el contador. El chat, cuando esté conectado, responde con IA (Claude) y puede equivocarse — verificá cualquier cifra o decisión importante con el contador.
     </div>
   </div>
 </div>
@@ -1035,7 +1049,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.07.3';
+var APP_VERSION='2026.07.07.4';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1341,6 +1355,7 @@ function pg(id,btn,skipHash){
     if(id==='portafolio'){renderPortafolio();}
     if(id==='mapa'){initMapa();}
     if(id==='documentos'){renderDocProyectos();}
+    if(id==='guia'){initChatContable();}
   }
   // 'misfinanzas' es 100% local (personal de Anyelo), y 'guia' es contenido
   // estático de referencia — ninguna de las dos necesita tocar Sheets.
@@ -1365,6 +1380,89 @@ function setT(t,btn){
 // para que Anyelo vea, ANTES de guardar, cómo va a quedar clasificado el
 // movimiento y si algo parece inconsistente.
 var CATEGORIAS_COSTO=['Alquiler terreno','Preparación terreno','Compra semilla + Siembra Integral','Aplicaciones Paquete Técnico','Mantenimiento Finca + Boom','Cosecha'];
+// ══════════════════ CHAT CONTABLE CON IA (Claude, vía Apps Script) ══════════════════
+// El navegador NUNCA guarda ni ve la API key de Anthropic — le pregunta al
+// Apps Script (accion='chat_contable'), que es quien la tiene guardada en sus
+// Script Properties y habla con la API de Anthropic del lado del servidor.
+// Si esa acción todavía no existe en el backend, el chat avisa y no rompe nada.
+var CHAT_HISTORIAL=[];
+var CHAT_DISPONIBLE=null; // null=sin probar, true/false una vez se sabe
+
+function initChatContable(){
+  if(CHAT_HISTORIAL.length===0){
+    CHAT_HISTORIAL.push({rol:'asistente',texto:'Hola, soy el asistente contable de Costa Piña. Preguntame cómo registrar algo (ej. "¿cómo anoto el préstamo de Coopealianza?") — respondo con base en las reglas de esta guía y tus proyectos reales.'});
+    renderChatMensajes();
+  }
+  var tag=document.getElementById('chat-estado-tag');
+  if(CHAT_DISPONIBLE===true){tag.textContent='conectado';tag.className='ctag badge-real';return;}
+  if(CHAT_DISPONIBLE===false){tag.textContent='no conectado';document.getElementById('chat-offline').style.display='block';return;}
+  tag.textContent='verificando…';
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({key:API_KEY,accion:'chat_contable',pregunta:'ping',historial:[]})})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      CHAT_DISPONIBLE=!!(res&&res.ok!==false&&res.accionExiste!==false);
+      var t=document.getElementById('chat-estado-tag');
+      if(CHAT_DISPONIBLE){t.textContent='conectado';t.className='ctag badge-real';}
+      else{t.textContent='no conectado';document.getElementById('chat-offline').style.display='block';}
+    })
+    .catch(function(){
+      CHAT_DISPONIBLE=false;
+      document.getElementById('chat-estado-tag').textContent='no conectado';
+      document.getElementById('chat-offline').style.display='block';
+    });
+}
+
+function renderChatMensajes(){
+  var el=document.getElementById('chat-mensajes');
+  if(!el)return;
+  el.innerHTML=CHAT_HISTORIAL.map(function(m){
+    var esUsuario=m.rol==='usuario';
+    return '<div style="align-self:'+(esUsuario?'flex-end':'flex-start')+';max-width:85%;background:'+(esUsuario?'var(--tone-1)':'var(--fog)')+';color:'+(esUsuario?'#fff':'var(--ink2)')+';border-radius:12px;padding:9px 12px;font-size:13px;line-height:1.5;white-space:pre-wrap">'+m.texto.replace(/</g,'&lt;')+'</div>';
+  }).join('');
+  el.scrollTop=el.scrollHeight;
+}
+
+function enviarPreguntaContable(){
+  var input=document.getElementById('chat-input');
+  var pregunta=(input.value||'').trim();
+  if(!pregunta)return;
+  if(CHAT_DISPONIBLE===false){toast('⚠ El chat todavía no está conectado — ver nota debajo del chat',true);return;}
+  input.value='';
+  CHAT_HISTORIAL.push({rol:'usuario',texto:pregunta});
+  CHAT_HISTORIAL.push({rol:'asistente',texto:'Pensando…'});
+  renderChatMensajes();
+  var btn=document.getElementById('chat-btn-enviar');
+  btn.disabled=true;
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({key:API_KEY,accion:'chat_contable',pregunta:pregunta,
+      historial:CHAT_HISTORIAL.slice(0,-2).slice(-10)})})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      btn.disabled=false;
+      CHAT_HISTORIAL.pop(); // quita "Pensando…"
+      if(!res||res.ok===false){
+        CHAT_DISPONIBLE=false;
+        document.getElementById('chat-offline').style.display='block';
+        document.getElementById('chat-estado-tag').textContent='no conectado';
+        CHAT_HISTORIAL.push({rol:'asistente',texto:'⚠ No pude responder — el chat todavía no está conectado del lado del servidor. Mirá la nota debajo del chat.'});
+      } else {
+        CHAT_DISPONIBLE=true;
+        document.getElementById('chat-estado-tag').textContent='conectado';
+        document.getElementById('chat-estado-tag').className='ctag badge-real';
+        document.getElementById('chat-offline').style.display='none';
+        CHAT_HISTORIAL.push({rol:'asistente',texto:res.respuesta||'(sin respuesta)'});
+      }
+      renderChatMensajes();
+    })
+    .catch(function(){
+      btn.disabled=false;
+      CHAT_HISTORIAL.pop();
+      CHAT_HISTORIAL.push({rol:'asistente',texto:'⚠ Sin conexión — intentá de nuevo en un momento.'});
+      renderChatMensajes();
+    });
+}
+
 function sugerenciaContable(){
   var el=document.getElementById('n-sugerencia');
   if(!el)return;
