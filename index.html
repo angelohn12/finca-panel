@@ -674,6 +674,11 @@ nav>*{position:relative;z-index:1;}
         <select id="np-ciclo" class="fi"><option value="PC">PC · Primera Cosecha</option><option value="SC">SC · Segunda Cosecha</option><option value="TC">TC · Tercera Cosecha</option><option value="Otro">Otro</option></select>
       </div>
     </div>
+    <div style="display:grid;grid-template-columns:1fr;gap:11px;margin-bottom:11px">
+      <div class="field"><label>Tipo de semilla (solo aplica a PC · Primera Cosecha)</label>
+        <select id="np-tipo-semilla" class="fi"><option value="corona">Corona · siembra→cosecha ~15 meses</option><option value="guia">Guía / axilar (hijo) · siembra→cosecha ~12 meses</option></select>
+      </div>
+    </div>
     <div class="field" style="margin-bottom:14px;background:var(--fog);border:1px dashed var(--border);border-radius:8px;padding:10px">
       <label>Precargar costo con un modelo (según hectáreas de arriba)</label>
       <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap">
@@ -1049,7 +1054,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.07.5';
+var APP_VERSION='2026.07.11.1';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1596,6 +1601,7 @@ function abrirNuevoProyecto(){
   document.getElementById('np-plantas').value='65000';
   document.getElementById('np-inv').value='';
   document.getElementById('np-ciclo').value='PC';
+  document.getElementById('np-tipo-semilla').value='corona';
   document.getElementById('np-siembra').value='';
   document.getElementById('np-modelo-costo').value='';
   colorSeleccionado=COLORES[APP.proyectos.length%COLORES.length];
@@ -1650,6 +1656,7 @@ function guardarProyecto(){
   var plantas=parseInt(document.getElementById('np-plantas').value)||65000;
   var inv=parseFloat(document.getElementById('np-inv').value)||0;
   var ciclo=document.getElementById('np-ciclo').value;
+  var tipoSemilla=document.getElementById('np-tipo-semilla').value||'corona';
   var siembra=document.getElementById('np-siembra').value;
   var cultivo=document.getElementById('np-cultivo').value.trim();
   var socios=getSociosDelForm();
@@ -1666,14 +1673,14 @@ function guardarProyecto(){
   cargarDesdeSheets(function(){
     if(editandoProjId){
       var proj=APP.proyectos.find(function(p){return p.id===editandoProjId;});
-      if(proj){proj.nombre=nombre;proj.cultivo=cultivo;proj.ha=ha;proj.plantas=plantas;proj.inv=inv;proj.ciclo=ciclo;proj.siembra=siembra;proj.socios=socios;proj.color=colorSeleccionado;}
+      if(proj){proj.nombre=nombre;proj.cultivo=cultivo;proj.ha=ha;proj.plantas=plantas;proj.inv=inv;proj.ciclo=ciclo;proj.tipoSemilla=tipoSemilla;proj.siembra=siembra;proj.socios=socios;proj.color=colorSeleccionado;}
       else{toast('⚠ Ese proyecto ya no existe en Sheets (¿lo borró el otro usuario?)',true);cerrarModal('modal-proj');renderPortafolio();return;}
     } else {
       var precios=JSON.parse(JSON.stringify(PRECIOS_BASE));
       // Si se precargó un modelo de costo con desglose (económico), usarlo;
       // si no, el default de siempre (premium no trae desglose, solo total).
       var presupInicial=NP_PRESUPUESTO_PRECARGADO||JSON.parse(JSON.stringify(PRESUP_DEFAULT));
-      APP.proyectos.push({id:APP.nextProjId++,nombre:nombre,cultivo:cultivo,ha:ha,plantas:plantas,inv:inv,ciclo:ciclo,siembra:siembra,socios:socios,color:colorSeleccionado,precios:precios,rend:100,mort:5,activo:true,presupuesto:presupInicial});
+      APP.proyectos.push({id:APP.nextProjId++,nombre:nombre,cultivo:cultivo,ha:ha,plantas:plantas,inv:inv,ciclo:ciclo,tipoSemilla:tipoSemilla,siembra:siembra,socios:socios,color:colorSeleccionado,precios:precios,rend:100,mort:5,activo:true,presupuesto:presupInicial});
       NP_PRESUPUESTO_PRECARGADO=null;
     }
     saveL();
@@ -1742,7 +1749,7 @@ function renderPortafolio(){
     h+='<div class="proj-wrap">';
     h+='<div class="proj-hd" style="background:linear-gradient(135deg,'+darken(p.color)+','+p.color+')">';
     h+='<div><div class="proj-title">🌿 '+p.nombre+'</div>';
-    h+='<div class="proj-sub">'+p.ha+' ha · '+p.cultivo+(p.siembra?' · Siembra: '+p.siembra:'')+'</div></div>';
+    h+='<div class="proj-sub">'+p.ha+' ha · '+p.cultivo+(p.ciclo==='PC'?(' · Semilla '+(p.tipoSemilla==='guia'?'guía/axilar':'corona')):'')+(p.siembra?' · Siembra: '+p.siembra:'')+'</div></div>';
     h+='<div class="proj-actions">';
     h+='<span class="act-badge '+(p.activo?'badge-activo':'badge-planeado')+'">'+(p.activo?p.ciclo+' · Activo':'Planeado')+'</span>';
     h+='<button onclick="editarProyecto('+p.id+')" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">✎ Editar</button>';
@@ -1859,6 +1866,7 @@ function editarProyecto(pid){
   document.getElementById('np-plantas').value=p.plantas||65000;
   document.getElementById('np-inv').value=p.inv;
   document.getElementById('np-ciclo').value=p.ciclo||'PC';
+  document.getElementById('np-tipo-semilla').value=p.tipoSemilla||'corona';
   // El input type="month" solo entiende "YYYY-MM". Google Sheets guarda las
   // fechas como texto ISO completo (ej: "2026-04-01T06:00:00.000Z") — si se
   // le pasa tal cual, el input la rechaza en silencio y queda vacía. Por eso
@@ -2478,9 +2486,17 @@ function renderMiVista(){
 // SC/TC (segunda/tercera cosecha, retoño de la misma planta): estimado, más
 // corto que la primera — ajustable cuando haya dato de campo medido.
 var DURACION_CICLO_MESES={PC:15,SC:11,TC:11,Otro:14};
+// PC con semilla guía/axilar (hijo): forzamiento más temprano que con corona,
+// cosecha ~mes 12 en vez de ~15. Solo aplica a PC — SC/TC son retoño de la
+// misma planta, no dependen del tipo de semilla original.
+var DURACION_PC_GUIA_MESES=12;
+function calcDuracionCicloMeses(p){
+  if(p.ciclo==='PC'&&p.tipoSemilla==='guia')return DURACION_PC_GUIA_MESES;
+  return DURACION_CICLO_MESES[p.ciclo]||14;
+}
 
 function buildMiniTimeline(p){
-  var totalMeses=DURACION_CICLO_MESES[p.ciclo]||14;
+  var totalMeses=calcDuracionCicloMeses(p);
   var mesesPasados=calcMesesDesde(p.siembra);
   var h='<div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden">';
   for(var i=1;i<=totalMeses;i++){
@@ -2504,7 +2520,7 @@ function calcMesesDesde(siembra){
 }
 
 function calcMesesACosecha(p){
-  var totalMeses=DURACION_CICLO_MESES[p.ciclo]||14;
+  var totalMeses=calcDuracionCicloMeses(p);
   var pasados=calcMesesDesde(p.siembra);
   return Math.max(0,totalMeses-pasados+1);
 }
@@ -2516,7 +2532,7 @@ function calcFechaCosechaEstimada(p){
   var partes=p.siembra.split('-');
   var y=parseInt(partes[0]),m=parseInt(partes[1]);
   if(isNaN(y)||isNaN(m))return null;
-  var totalMeses=DURACION_CICLO_MESES[p.ciclo]||14;
+  var totalMeses=calcDuracionCicloMeses(p);
   var d=new Date(y,m-1+totalMeses,1);
   return d;
 }
@@ -2567,7 +2583,7 @@ function fmtSiembraCorta(siembra){
 function docFlujoMensualProyecto(p){
   var meses={};
   var fCosecha=calcFechaCosechaEstimada(p);
-  var totalMesesCiclo=DURACION_CICLO_MESES[p.ciclo]||14;
+  var totalMesesCiclo=calcDuracionCicloMeses(p);
   var egresoTotal=p.presupuesto?Object.keys(p.presupuesto).reduce(function(s,k){return s+(parseFloat(p.presupuesto[k])||0);},0):(p.inv||0);
   if(!egresoTotal)egresoTotal=p.inv||0;
   var ingresoTotal=calcIngreso(p);
@@ -2961,7 +2977,8 @@ function syncProyectosASheet(silencioso){
       // no solo en su propio navegador).
       JSON.stringify((p.precios||[]).map(function(pr){return{key:pr.key,precio:pr.precio,pct:pr.pct};})),
       p.rend||100, p.mort||5,
-      JSON.stringify(p.presupuesto||PRESUP_DEFAULT)
+      JSON.stringify(p.presupuesto||PRESUP_DEFAULT),
+      p.tipoSemilla||'corona'
     ];
   });
   // 'reemplazar_todo' es idempotente por diseño (borra y reescribe), no genera duplicados
@@ -3375,7 +3392,7 @@ function cargarDesdeSheets(callback){
             plantas:parseInt(p[4])||65000,inv:parseFloat(p[5])||0,ciclo:p[6],siembra:p[7],
             color:p[8]||'#1a5c2e',activo:p[9]==='Sí',socios:socios,
             precios:precios,rend:parseFloat(p[12])||100,mort:parseFloat(p[13])||5,
-            presupuesto:presupuesto};
+            presupuesto:presupuesto,tipoSemilla:p[15]||'corona'};
         });
         APP.nextProjId=Math.max.apply(null,APP.proyectos.map(function(p){return p.id;}))+1;
       }
