@@ -420,6 +420,7 @@ nav>*{position:relative;z-index:1;}
       </div>
     </div>
     <div class="emp-stats" id="emp-stats"></div>
+    <div id="emp-desglose-sociedad"></div>
   </div>
 
   <div class="sec">Socios internos</div>
@@ -685,8 +686,13 @@ nav>*{position:relative;z-index:1;}
         <select id="np-tipo-semilla" class="fi"><option value="corona">Corona · siembra→cosecha ~15 meses</option><option value="guia">Guía / axilar (hijo) · siembra→cosecha ~12 meses</option></select>
       </div>
       <div class="field"><label>Sociedad / empresa (opcional)</label>
-        <input type="text" id="np-sociedad" class="fi" placeholder="Ej: JORISU S.R.L., cédula jurídica, o negocio privado">
-        <div style="font-size:10px;color:var(--ink4);margin-top:3px">No siempre es JORISU — algunos proyectos son de otra sociedad familiar. Dejalo vacío si aún no tiene nombre/cédula.</div>
+        <select id="np-sociedad" class="fi">
+          <option value="">— sin asignar —</option>
+          <option value="JORISU S.R.L.">JORISU S.R.L.</option>
+          <option value="3-102-964020 S.R.L.">3-102-964020 S.R.L. (Kendall y Jonathan)</option>
+          <option value="Johan">Johan</option>
+        </select>
+        <div style="font-size:10px;color:var(--ink4);margin-top:3px">No siempre es JORISU — algunos proyectos son de otra sociedad familiar.</div>
       </div>
     </div>
     <div class="field" style="margin-bottom:14px;background:var(--fog);border:1px dashed var(--border);border-radius:8px;padding:10px">
@@ -1064,7 +1070,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.11.2';
+var APP_VERSION='2026.07.11.3';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1724,12 +1730,21 @@ function svgDonutSocios(socios,ganN){
     '<text x="'+cx+'" y="'+(cy+12)+'" text-anchor="middle" font-size="8.5" fill="var(--ink4)" font-family="Plus Jakarta Sans,sans-serif">proyectado</text>'+
     '</svg></div>';
 }
+// Un proyecto se considera "de JORISU" si su campo sociedad menciona JORISU
+// (o quedó vacío en un proyecto viejo que sabemos que es JORISU — hoy todos
+// los proyectos históricos sin etiquetar deben revisarse y taggearse manual-
+// mente vía "Editar proyecto" para que este cálculo sea exacto).
+function esJorisu(p){
+  return !!(p.sociedad&&p.sociedad.toLowerCase().indexOf('jorisu')!==-1);
+}
 function renderPortafolio(){
   // Filtro por sociedad/empresa: distintos proyectos del sistema pueden
   // pertenecer a sociedades legales distintas (ej. JORISU S.R.L. vs. otra
   // sociedad de Jonathan con un socio ajeno a JORISU) — se sigue registrando
-  // todo acá porque igual es plata/calendario de la familia, pero el filtro
-  // permite ver "solo JORISU" cuando hace falta (ej. reportes societarios).
+  // TODO acá (aparece igual en Mi Vista, calendario de ingresos, etc. de
+  // Jonathan) porque sigue siendo plata/negocio de la familia. El filtro de
+  // abajo y el desglose JORISU/Total de "Mi Empresa" son solo una lupa
+  // adicional en Portafolio, nunca ocultan datos en el resto del dashboard.
   var selSociedad=document.getElementById('pf-filtro-sociedad');
   var valorFiltro=selSociedad?selSociedad.value:'';
   var sociedades=Array.from(new Set(APP.proyectos.map(function(p){return p.sociedad||'(sin sociedad asignada)';}))).sort();
@@ -1749,11 +1764,32 @@ function renderPortafolio(){
     return s+(mio?Math.max(0,calcGanancia(p)*(mio.pctGanancia/100)):0);
   },0);
   document.getElementById('emp-stats').innerHTML=
-    '<div><div class="esv">'+proyectosFiltrados.length+'</div><div class="esl">Proyectos</div></div>'+
+    '<div><div class="esv">'+proyectosFiltrados.length+'</div><div class="esl">Proyectos'+(valorFiltro?' ('+valorFiltro+')':'')+'</div></div>'+
     '<div><div class="esv">'+totalHa.toFixed(1)+' ha</div><div class="esl">Hectáreas operativas</div></div>'+
     '<div><div class="esv">$'+Math.round(totalInv).toLocaleString('es-CR')+'</div><div class="esl">Capital invertido</div></div>'+
     '<div><div class="esv">~$'+Math.round(totalGanProy).toLocaleString('es-CR')+'</div><div class="esl">Ganancia total proy.</div></div>'+
     '<div><div class="esv">~$'+Math.round(tuParteTotal).toLocaleString('es-CR')+'</div><div class="esl">Tu parte total</div></div>';
+
+  // Desglose fijo JORISU vs. Total general — SIEMPRE visible, sin importar el
+  // filtro de arriba, porque Anyelo pidió distinguir claramente cuánto es de
+  // JORISU S.R.L. (societario) vs. el total incluyendo negocios familiares
+  // fuera de JORISU (ej. Corona 1 con Kendall, Vaskonia con otro socio).
+  var elDesglose=document.getElementById('emp-desglose-sociedad');
+  if(elDesglose){
+    var jorisuProys=APP.proyectos.filter(esJorisu);
+    var noJorisuProys=APP.proyectos.filter(function(p){return !esJorisu(p);});
+    var sumInv=function(list){return list.reduce(function(s,p){return s+p.inv;},0);};
+    var sumGan=function(list){return list.reduce(function(s,p){return s+calcGanancia(p);},0);};
+    var totalInvGeneral=sumInv(APP.proyectos), totalGanGeneral=sumGan(APP.proyectos);
+    var totalInvJorisu=sumInv(jorisuProys), totalGanJorisu=sumGan(jorisuProys);
+    var hayNoTaggeados=noJorisuProys.some(function(p){return !p.sociedad;});
+    elDesglose.innerHTML=
+      '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.15)">'+
+      '<div style="font-size:11px;color:rgba(255,255,255,.75)"><b style="color:#fff">Total general (todos los proyectos)</b> · '+APP.proyectos.length+' proy. · $'+Math.round(totalInvGeneral).toLocaleString('es-CR')+' invertido · ~$'+Math.round(totalGanGeneral).toLocaleString('es-CR')+' ganancia proy.</div>'+
+      '<div style="font-size:11px;color:rgba(255,255,255,.75)"><b style="color:#fff">Solo JORISU S.R.L.</b> · '+jorisuProys.length+' proy. · $'+Math.round(totalInvJorisu).toLocaleString('es-CR')+' invertido · ~$'+Math.round(totalGanJorisu).toLocaleString('es-CR')+' ganancia proy.</div>'+
+      '</div>'+
+      (hayNoTaggeados?'<div style="font-size:10px;color:#ffe08a;margin-top:6px">⚠ Hay proyectos sin sociedad asignada — este desglose no es exacto hasta que edités cada proyecto y le pongas su sociedad ("JORISU S.R.L." o la que corresponda).</div>':'');
+  }
 
   if(proyectosFiltrados.length===0){
     document.getElementById('proyectos-list').innerHTML=
