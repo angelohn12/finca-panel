@@ -495,8 +495,8 @@ nav>*{position:relative;z-index:1;}
         <div class="mv-nombre">👤 Mi Vista</div>
         <div class="mv-sub" id="mv-sub">Socio administrador</div>
       </div>
-      <div style="text-align:right;flex-shrink:0;margin-left:16px">
-        <div style="font-size:10px;opacity:.4;text-transform:uppercase;letter-spacing:1px">Salario externo</div>
+      <div style="text-align:right;flex-shrink:0;margin-left:16px;cursor:pointer" onclick="abrirModalSalario()" title="Tocá para editar tu salario objetivo">
+        <div style="font-size:10px;opacity:.4;text-transform:uppercase;letter-spacing:1px">Salario externo ✎</div>
         <div style="font-size:16px;font-weight:800;color:#a8d5ff;margin-top:2px" id="mv-salario">—</div>
         <div style="font-size:10px;opacity:.4;margin-top:3px">hasta el cruce</div>
       </div>
@@ -1070,7 +1070,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.07.11.3';
+var APP_VERSION='2026.07.27.1';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
