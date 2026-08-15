@@ -1179,7 +1179,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.08.15.2';
+var APP_VERSION='2026.08.15.3';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1849,6 +1849,7 @@ function renderPortafolio(){
     h+='</div></div>';
 
     h+='<div style="padding:16px">';
+    if(p.activo)h+=renderAlertasEstacionalidad(p);
     h+='<div class="g4">';
     h+='<div class="kpi g"><div class="kl">Inversión</div><div class="kv">$'+p.inv.toLocaleString('es-CR',{minimumFractionDigits:0})+'</div><div class="ks">'+(p.inv===0?'<span style="color:var(--red)">⚠ sin inversión registrada</span>':'presupuestado')+'</div></div>';
     h+='<div class="kpi s"><div class="kl">Ingreso bruto proy.</div><div class="kv">$'+Math.round(calcIngreso(p)).toLocaleString('es-CR')+'</div><div class="ks"><span class="'+(esReal?'badge-real':'badge-proy')+'">'+(esReal?'real':'proyectado')+'</span></div></div>';
@@ -2628,6 +2629,68 @@ function calcFechaCosechaEstimada(p){
   var totalMeses=calcDuracionCicloMeses(p);
   var d=new Date(y,m-1+totalMeses,1);
   return d;
+}
+
+// ══════════════ ALERTAS DE ESTACIONALIDAD (fruta natural / floración natural) ══════════════
+// Criterios dados por Anyelo/Jonathan 09/08/2026 + respaldo bibliográfico
+// investigado esa misma fecha (ver memoria del negocio, no repetir la
+// investigación si se toca este código después).
+//
+// 1) Ventana de precio piso: los fríos de diciembre inducen floración
+//    natural en TODA la zona a la vez → sobreoferta → si la cosecha cae
+//    entre el 1 jun y el 25 jul, el precio está en su punto más bajo del
+//    año. Desde el 25 jul en adelante empieza a subir. Aplica sobre todo
+//    a venta en mercado nacional (spot) — exportación con comprador fijo
+//    se ve menos afectada, pero igual vale la pena avisar.
+var MES_INICIO_VENTANA_MALA=6,DIA_FIN_VENTANA_MALA_JUL=25;
+function calcAlertaPrecioBajo(p){
+  var f=calcFechaCosechaEstimada(p);
+  if(!f)return null;
+  var m=f.getMonth()+1;
+  var enVentanaMala=(m===MES_INICIO_VENTANA_MALA)||(m===7&&f.getDate()<=DIA_FIN_VENTANA_MALA_JUL);
+  if(!enVentanaMala)return null;
+  var mesTxt=f.toLocaleDateString('es-CR',{month:'long',year:'numeric'});
+  return '🔴 <b>Cosecha proyectada '+mesTxt+'</b> — cae en la ventana de precio piso (jun–25 jul) por sobreoferta de fruta natural en toda la zona. Pensá en adelantar el forzamiento para salir en mayo, o atrasarlo para salir en agosto.';
+}
+
+// 2) Riesgo de floración natural sola: si para la temporada fría
+//    (2da quincena nov – 1ra quincena feb) la planta ya tiene edad
+//    suficiente (≥8 meses aprox.) y todavía NO se le ha forzado, el frío
+//    puede inducirla por su cuenta y adelantar/perder el control de la
+//    fecha de cosecha. <6 meses probablemente no responde. 6-8 meses es
+//    zona gris. Umbral aproximado, no confirmado con Jonathan con
+//    precisión — mostrar siempre como advertencia a verificar, nunca
+//    como certeza. Se usa el 1 de enero como punto medio aproximado de
+//    la ventana nov15-feb15 para calcular la edad de la planta en esa
+//    temporada (simplificación: no se pondera el solape exacto de días).
+//    Solo aplica a plantación nueva con semilla corona (PC, no "guía" ni
+//    retoños SC/TC) — es el único caso con el dato de forzamiento ~mes 10
+//    confirmado por Jonathan.
+function calcAlertaFloracionNatural(p){
+  if(!p.siembra||p.ciclo!=='PC'||p.tipoSemilla==='guia')return null;
+  var partes=p.siembra.split('-');
+  var y=parseInt(partes[0]),m=parseInt(partes[1]);
+  if(isNaN(y)||isNaN(m))return null;
+  var edadEnEneroMeses=13-m; // edad el 1 de enero siguiente a la siembra
+  var temporada=y+'/'+(y+1);
+  if(edadEnEneroMeses>=10)return null; // para esa temporada ya debería estar forzada (regla de los ~10 meses)
+  if(edadEnEneroMeses>=8){
+    return '⚠️ <b>Riesgo de floración natural</b> — para la temporada fría '+temporada+' (nov-feb) este lote va a tener ~'+edadEnEneroMeses+' meses, sin forzar todavía. El frío podría inducirlo solo y adelantar la cosecha fuera de tu control. Confirmar con Jonathan si conviene forzar antes.';
+  }
+  if(edadEnEneroMeses>=6){
+    return '🟡 Zona gris: para la temporada fría '+temporada+' este lote va a tener ~'+edadEnEneroMeses+' meses — posible riesgo de floración natural, sin confirmar. Vale la pena vigilarlo cuando se acerque esa fecha.';
+  }
+  return null;
+}
+
+// Junta ambas alertas en el bloque HTML que se inserta en la tarjeta del
+// proyecto (Portafolio). Devuelve '' si no aplica ninguna.
+function renderAlertasEstacionalidad(p){
+  var msgs=[calcAlertaPrecioBajo(p),calcAlertaFloracionNatural(p)].filter(Boolean);
+  if(!msgs.length)return '';
+  return '<div style="margin:0 0 14px;padding:10px 12px;background:#fff8e6;border:1px solid #f0d68a;border-left:3px solid var(--sun);border-radius:8px">'+
+    msgs.map(function(m){return '<div style="font-size:11.5px;color:var(--ink2);line-height:1.5">'+m+'</div>';}).join('<div style="height:6px"></div>')+
+    '</div>';
 }
 
 // ══════════════════ GENERADOR DE DOCUMENTOS FINANCIEROS ══════════════════
