@@ -1001,7 +1001,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.08.13.1';
+var APP_VERSION='2026.08.15.1';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1308,10 +1308,12 @@ function pg(id,btn,skipHash){
     if(id==='mapa'){initMapa();}
     if(id==='documentos'){renderDocProyectos();}
   }
-  // 'misfinanzas' es 100% local (personal de Anyelo) — no necesita tocar Sheets.
-  // Las demás pestañas siempre refrescan primero desde Sheets (fuente de verdad)
-  // para que los cambios de otros usuarios/dispositivos aparezcan sin botón manual.
-  if(id==='misfinanzas'){render();return;}
+  // Todas las pestañas refrescan primero desde Sheets (fuente de verdad) para
+  // que los cambios de otros usuarios/dispositivos aparezcan sin botón manual.
+  // 'misfinanzas' también lo necesita: aunque el presupuesto/gastos personales
+  // son locales, su sub-pestaña "Integración Empresa" usa APP.proyectos (datos
+  // de Sheets) — sin este refresco mostraba cifras viejas de Corona 4 mientras
+  // "Mi Vista" sí estaba al día (discrepancia detectada 15/08/2026).
   refrescarDesdeSheetsSiPosible(render);
 }
 
@@ -3702,6 +3704,17 @@ function renderPFIntegracion(){
     return{proj:proj,socio:s,tuParte:tp,mesesLeft:ml};
   }).filter(Boolean);
   var totJ=proyAnye.reduce(function(s,x){return s+x.tuParte;},0);
+  // Próxima cosecha con datos reales (reemplaza una nota que antes estaba
+  // escrita a mano y quedaba desactualizada — ver discrepancia Corona 4 15/08/2026).
+  var proxima=proyAnye.filter(function(x){return x.mesesLeft>0;}).sort(function(a,b){return a.mesesLeft-b.mesesLeft;})[0];
+  var notaProxima;
+  if(proxima){
+    var fProx=calcFechaCosechaEstimada(proxima.proj);
+    var fProxTxt=fProx?(MESES_CORTOS[fProx.getMonth()]+'. '+fProx.getFullYear()):('~'+proxima.mesesLeft+' meses');
+    notaProxima='📌 '+fProxTxt+': cosecha '+proxima.proj.nombre+' (≈$'+Math.round(proxima.tuParte).toLocaleString('es-CR')+' tu parte) → próxima entrada de efectivo proyectada.';
+  } else {
+    notaProxima='📌 Sin proyectos con cosecha pendiente registrada.';
+  }
   var h='<div class="g3" style="margin-bottom:14px">';
   h+='<div style="background:var(--fog);border:1px solid var(--border);border-radius:var(--radius);padding:16px">'+
     '<div style="font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">\uD83C\uDFE2 Salario externo</div>'+
@@ -3741,7 +3754,7 @@ function renderPFIntegracion(){
       '<span style="font-size:10px;color:var(--ink4)">$0</span>'+
       '<span style="font-size:10px;color:var(--red);font-weight:600">Meta: $'+neto+'/mes</span>'+
       '<span style="font-size:10px;color:var(--ink4)">$'+(neto*2)+'</span></div>'+
-    '<div style="margin-top:10px;padding:10px;background:var(--fog);border-radius:6px;font-size:11px;color:var(--ink3)">\uD83D\uDCCC Sep 2027: cosecha Lote B (\u2248$20k tu parte) \u2192 punto de inflexión donde la empresa se autofinancia.</div>'+
+    '<div style="margin-top:10px;padding:10px;background:var(--fog);border-radius:6px;font-size:11px;color:var(--ink3)">'+notaProxima+'</div>'+
   '</div></div>';
   document.getElementById('pft-integracion').innerHTML=h;
 }
