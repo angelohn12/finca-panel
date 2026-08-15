@@ -332,6 +332,42 @@ nav>*{position:relative;z-index:1;}
 .lote-tooltip{background:rgba(13,46,26,.82) !important;border:none !important;color:#fff !important;font-family:'Plus Jakarta Sans',sans-serif !important;font-weight:800 !important;font-size:12px !important;box-shadow:none !important;padding:2px 8px !important;}
 .lote-tooltip::before{display:none !important;}
 .leaflet-container{font-family:'Plus Jakarta Sans',sans-serif;}
+
+/* ── BLOQUES DE SIEMBRA (delimitador sobre foto de dron) ── */
+#bq-stage{min-height:320px;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--fog);}
+.bq-dropzone{width:100%;max-width:520px;border:2px dashed var(--border);border-radius:var(--radius);background:var(--card);padding:38px 24px;text-align:center;color:var(--ink4);}
+.bq-dropzone.drag{border-color:var(--leaf2);background:var(--mist);color:var(--ink);}
+.bq-dropzone .bq-dz-icon{font-size:30px;margin-bottom:8px;}
+.bq-dropzone h3{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px;}
+.bq-dropzone p{font-size:12.5px;margin:0 0 14px;}
+.bq-dropzone .bq-privacy{font-size:10.5px;font-family:'JetBrains Mono',monospace;margin-top:14px;opacity:.85;}
+#bq-canvas{max-width:100%;height:auto;display:block;border-radius:8px;box-shadow:var(--shadow);cursor:crosshair;background:var(--mist);}
+#bq-grid{display:grid;grid-template-columns:330px 1fr;gap:14px;align-items:start;}
+@media (max-width:900px){#bq-grid{grid-template-columns:1fr;}}
+.bq-tool-row{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;}
+.bq-hint{font-size:11.5px;color:var(--ink4);margin:0 0 10px;line-height:1.5;}
+.bq-status{font-size:12px;color:var(--ink3);margin:0 0 10px;min-height:30px;line-height:1.4;}
+.bq-field-row{display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap;}
+.bq-field-row label{font-size:11.5px;color:var(--ink4);flex:none;}
+.bq-field-row .fi{padding:6px 9px;font-size:12.5px;}
+.bq-field-row .fi.bq-narrow{width:78px;flex:none;}
+.bq-badge{font-family:'JetBrains Mono',monospace;font-size:10px;color:#fff;background:var(--leaf2);padding:1px 8px;border-radius:20px;}
+#bq-table-wrap{max-height:480px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+#bq-table-wrap table{width:100%;border-collapse:collapse;font-size:12px;}
+#bq-table-wrap thead th{position:sticky;top:0;background:var(--fog);text-align:left;padding:7px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink4);border-bottom:1px solid var(--border);}
+#bq-table-wrap tbody tr{border-bottom:1px solid var(--border);}
+#bq-table-wrap tbody tr:last-child{border-bottom:none;}
+#bq-table-wrap tbody tr:hover{background:var(--fog);}
+#bq-table-wrap tbody tr.bq-editing-row{background:var(--mist);box-shadow:inset 2px 0 0 var(--leaf2);}
+#bq-table-wrap tbody td{padding:6px 8px;vertical-align:middle;font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;}
+.bq-swatch{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px;flex:none;}
+.bq-num-input{width:42px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;background:var(--fog);color:var(--ink);font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;}
+.bq-parts-mark{font-size:9.5px;color:var(--ink4);margin-left:3px;}
+.bq-empty-row td{text-align:center;color:var(--ink4);padding:20px 8px;font-family:'Plus Jakarta Sans',sans-serif;}
+.bq-part-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border);}
+.bq-part-row:last-child{border-bottom:none;}
+.bq-kbd{background:var(--fog);border:1px solid var(--border);border-radius:4px;padding:0 5px;font-family:'JetBrains Mono',monospace;}
+#bq-print-preview img{max-width:100%;display:block;margin:0 auto;box-shadow:var(--shadow);border-radius:6px;}
 </style>
 </head>
 <body>
@@ -394,6 +430,7 @@ nav>*{position:relative;z-index:1;}
     <button class="nav-tab" id="tab-movimientos" onclick="pg('movimientos',this)">💳 Movimientos</button>
     <button class="nav-tab" id="tab-finanzas" onclick="pg('finanzas',this)">📊 Finanzas</button>
     <button class="nav-tab" id="tab-mapa" onclick="pg('mapa',this)">🗺️ Mapa</button>
+    <button class="nav-tab" id="tab-bloques" onclick="pg('bloques',this)">🧩 Bloques</button>
     <button class="nav-tab" id="tab-documentos" onclick="pg('documentos',this)">📄 Documentos</button>
     <button class="nav-tab" id="tab-misfinanzas" onclick="pg('misfinanzas',this)">💸 Mis Finanzas</button>
     <div class="nav-spacer"></div>
@@ -634,6 +671,147 @@ nav>*{position:relative;z-index:1;}
     </div>
   </div>
   <div id="mapa-lista-lotes"></div>
+</div>
+
+<!-- ══ BLOQUES DE SIEMBRA ══ -->
+<div class="page" id="p-bloques">
+  <div class="ph">
+    <div><div class="pt">Bloques de siembra</div><div class="ps">Delimitá y numerá los bloques sobre una foto aérea de dron · plantas y densidad por bloque</div></div>
+    <div id="bq-topbar-actions" style="display:none;gap:7px;flex-wrap:wrap">
+      <button class="btn btn-ghost" id="bq-btn-reload">↺ Cargar otra foto</button>
+      <button class="btn btn-ghost" id="bq-btn-tabla">📋 Tabla</button>
+      <button class="btn btn-primary" id="bq-btn-print">🖨️ Generar hoja de impresión</button>
+    </div>
+  </div>
+
+  <div class="card" style="overflow:hidden">
+    <div class="ch">
+      <div class="ct">Foto aérea</div>
+      <div class="bq-badge" id="bq-count-badge">0 bloques</div>
+    </div>
+    <div id="bq-stage">
+      <div class="bq-dropzone" id="bq-dropzone">
+        <div class="bq-dz-icon">📍</div>
+        <h3>Arrastrá la foto aérea aquí</h3>
+        <p>o seleccionala desde tu computadora</p>
+        <label style="display:inline-block">
+          <input type="file" id="bq-file-input" accept="image/*" style="display:none">
+          <button type="button" class="btn btn-primary" id="bq-pick-btn">Elegir imagen</button>
+        </label>
+        <p class="bq-privacy">La foto no se sube a ningún servidor — se queda en tu navegador hasta que generás la hoja.</p>
+      </div>
+      <div id="bq-canvas-wrap" style="display:none;max-width:100%">
+        <canvas id="bq-canvas"></canvas>
+      </div>
+    </div>
+    <div style="padding:10px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--ink4)" id="bq-status-footer">
+      Un bloque puede tener varios pedazos separados por una calle — cerrá cada pedazo (doble clic) y seguí marcando el siguiente antes de "Cerrar bloque".
+    </div>
+  </div>
+
+  <div id="bq-grid">
+    <div>
+      <div class="card" id="bq-meta-card" style="display:none">
+        <div class="ch"><div class="ct">Datos del mapa</div></div>
+        <div class="cb">
+          <div class="bq-field-row"><input type="text" id="bq-meta-finca" class="fi" placeholder="Finca / sociedad (ej. JORISU)"></div>
+          <div class="bq-field-row"><input type="text" id="bq-meta-lote" class="fi" placeholder="Lote (ej. Corona 1)"></div>
+          <div class="bq-field-row"><input type="text" id="bq-meta-ubicacion" class="fi" placeholder="Ubicación"></div>
+          <div class="bq-field-row"><label for="bq-meta-fecha">Fecha</label><input type="date" id="bq-meta-fecha" class="fi" style="width:auto"></div>
+          <div class="bq-field-row"><label for="bq-meta-area-aplic">Área aplic. (ha)</label><input type="number" id="bq-meta-area-aplic" class="fi bq-narrow" min="0" step="0.01" placeholder="= total"></div>
+          <div class="bq-field-row"><label for="bq-meta-angulo">Ángulo norte (°)</label><input type="number" id="bq-meta-angulo" class="fi bq-narrow" value="0" step="1"></div>
+        </div>
+      </div>
+
+      <div class="card" id="bq-tool-card" style="display:none">
+        <div class="ch"><div class="ct">Dibujar bloque</div></div>
+        <div class="cb">
+          <div class="bq-tool-row">
+            <button class="btn btn-ghost btn-sm" id="bq-btn-finish-part" disabled>Cerrar pedazo</button>
+            <button class="btn btn-primary btn-sm" id="bq-btn-finish" disabled>Cerrar bloque</button>
+          </div>
+          <div class="bq-tool-row">
+            <button class="btn btn-ghost btn-sm" id="bq-btn-undo" disabled>Deshacer</button>
+            <button class="btn btn-ghost btn-sm" id="bq-btn-cancel" disabled>Cancelar bloque</button>
+          </div>
+          <p class="bq-status" id="bq-status">Cargá una foto para empezar a marcar bloques.</p>
+          <div class="bq-field-row"><label for="bq-next-num">Próximo número</label><input type="number" id="bq-next-num" class="fi bq-narrow" min="1" value="1"></div>
+        </div>
+      </div>
+
+      <div class="card" id="bq-edit-card" style="display:none">
+        <div class="ch"><div class="ct">Editando bloque <span id="bq-edit-badge" class="bq-badge"></span></div></div>
+        <div class="cb">
+          <p class="bq-hint">Arrastrá los puntos blancos sobre la foto para ajustar la forma. Clic derecho sobre un punto lo elimina (mínimo 3 por pedazo).</p>
+          <div id="bq-edit-parts-list"></div>
+          <div class="bq-tool-row" style="margin-top:8px">
+            <button class="btn btn-primary btn-sm" id="bq-btn-edit-done">Terminar edición</button>
+            <button class="btn btn-ghost btn-sm" id="bq-btn-edit-cancel">Cancelar cambios</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="bq-calib-card" style="display:none">
+        <div class="ch"><div class="ct">Escala (recomendada)</div></div>
+        <div class="cb">
+          <p class="bq-hint">Marcá dos puntos de una distancia real conocida (ej. un ancho de calle) para calcular hectáreas, densidad y la barra de escala.</p>
+          <div class="bq-tool-row">
+            <button class="btn btn-ghost btn-sm" id="bq-btn-calib">Marcar 2 puntos</button>
+            <button class="btn btn-ghost btn-sm" id="bq-btn-calib-clear" style="display:none">Quitar escala</button>
+          </div>
+          <div class="bq-field-row" id="bq-calib-input-row" style="display:none">
+            <label for="bq-calib-meters">Distancia real (m)</label>
+            <input type="number" id="bq-calib-meters" class="fi bq-narrow" min="0" step="0.1">
+            <button class="btn btn-primary btn-sm" id="bq-btn-calib-apply">Aplicar</button>
+          </div>
+          <p class="bq-hint" id="bq-calib-result"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><div class="ct">Bloques</div><div class="bq-badge" id="bq-count-badge-2">0</div></div>
+      <div class="cb">
+        <div id="bq-table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Área</th><th>Plantas</th><th>Densidad</th><th></th></tr></thead>
+            <tbody id="bq-tbody">
+              <tr class="bq-empty-row"><td colspan="5">Todavía no hay bloques marcados.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-danger btn-sm" id="bq-btn-clear-all">🗑 Borrar todos los bloques</button>
+        <div style="font-size:10.5px;color:var(--ink4);font-family:'JetBrains Mono',monospace">clic: punto · doble clic: cerrar pedazo · Enter: cerrar bloque · Esc: cancelar</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL HOJA DE IMPRESIÓN (bloques) ══ -->
+<div class="overlay" id="modal-bq-hoja">
+  <div class="modal" style="width:920px">
+    <div class="modal-title"><span>Hoja de impresión</span><button class="modal-close" onclick="cerrarModal('modal-bq-hoja')">✕</button></div>
+    <div id="bq-print-preview"><img id="bq-print-img" alt="Hoja de impresión"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-bq-hoja')">Cerrar</button>
+      <button class="btn btn-primary" id="bq-btn-download-sheet">💾 Descargar PNG</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL TABLA (bloques) ══ -->
+<div class="overlay" id="modal-bq-tabla">
+  <div class="modal" style="width:560px">
+    <div class="modal-title"><span>Tabla de bloques</span><button class="modal-close" onclick="cerrarModal('modal-bq-tabla')">✕</button></div>
+    <p class="bq-hint" style="margin-bottom:8px">Tocá adentro (ya queda seleccionado), copiá con <span class="bq-kbd">Ctrl+C</span> y pegalo en Excel/Sheets — o descargalo directo como .csv.</p>
+    <textarea id="bq-table-textarea" readonly style="width:100%;min-height:240px;font-family:'JetBrains Mono',monospace;font-size:12px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--fog);color:var(--ink);resize:vertical"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+      <button class="btn btn-ghost" onclick="cerrarModal('modal-bq-tabla')">Cerrar</button>
+      <button class="btn btn-primary" id="bq-btn-download-csv">💾 Descargar CSV</button>
+    </div>
+  </div>
 </div>
 
 <!-- ══ MODAL DATOS DE LOTE ══ -->
@@ -1001,7 +1179,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.08.15.1';
+var APP_VERSION='2026.08.15.2';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1306,6 +1484,7 @@ function pg(id,btn,skipHash){
     if(id==='finanzas'){poblarSelectProyectos();renderFin();}
     if(id==='portafolio'){renderPortafolio();}
     if(id==='mapa'){initMapa();}
+    if(id==='bloques'){initBloques();}
     if(id==='documentos'){renderDocProyectos();}
   }
   // Todas las pestañas refrescan primero desde Sheets (fuente de verdad) para
@@ -3385,6 +3564,538 @@ function refrescarDesdeSheetsSiPosible(callback){
   });
 }
 
+/* ══════════════════════════════════════════════════════════════
+   BLOQUES DE SIEMBRA — delimitador de bloques sobre foto de dron
+   ══════════════════════════════════════════════════════════════
+   Solo local por ahora (no se guarda en Sheets): se dibuja sobre
+   la foto que el usuario carga, se numera, y se exporta como PNG
+   (hoja de impresión con tabla/área/norte/escala) o CSV/copiar.
+   Un bloque puede tener varios "pedazos" separados por una calle. */
+var BQ_INITED=false;
+function initBloques(){
+  if(BQ_INITED)return; // los controles ya están cableados; el DOM del tab no se destruye al cambiar de pestaña
+  BQ_INITED=true;
+
+  var state={
+    img:null,naturalW:0,naturalH:0,
+    blocks:[],        // {num, plantas, parts:[[[x,y],...], ...]}
+    active:[],          // puntos del pedazo que se está marcando
+    activeParts:[],      // pedazos ya cerrados, esperando a cerrarse como bloque
+    hoverIndex:-1,
+    editIndex:-1,editBackup:null,dragging:null,
+    calib:{armed:false,pts:[],pxPerMeter:null}
+  };
+
+  var canvas=document.getElementById('bq-canvas');
+  var ctx=canvas.getContext('2d');
+  var dropzone=document.getElementById('bq-dropzone');
+  var canvasWrap=document.getElementById('bq-canvas-wrap');
+  var fileInput=document.getElementById('bq-file-input');
+  var pickBtn=document.getElementById('bq-pick-btn');
+  var metaCard=document.getElementById('bq-meta-card');
+  var toolCard=document.getElementById('bq-tool-card');
+  var calibCard=document.getElementById('bq-calib-card');
+  var topbarActions=document.getElementById('bq-topbar-actions');
+  var statusEl=document.getElementById('bq-status');
+  var nextNumInput=document.getElementById('bq-next-num');
+  var btnFinishPart=document.getElementById('bq-btn-finish-part');
+  var btnFinish=document.getElementById('bq-btn-finish');
+  var btnUndo=document.getElementById('bq-btn-undo');
+  var btnCancel=document.getElementById('bq-btn-cancel');
+  var editCard=document.getElementById('bq-edit-card');
+  var editBadge=document.getElementById('bq-edit-badge');
+  var editPartsList=document.getElementById('bq-edit-parts-list');
+  var btnEditDone=document.getElementById('bq-btn-edit-done');
+  var btnEditCancel=document.getElementById('bq-btn-edit-cancel');
+  var btnCalib=document.getElementById('bq-btn-calib');
+  var btnCalibClear=document.getElementById('bq-btn-calib-clear');
+  var calibInputRow=document.getElementById('bq-calib-input-row');
+  var calibMetersInput=document.getElementById('bq-calib-meters');
+  var btnCalibApply=document.getElementById('bq-btn-calib-apply');
+  var calibResult=document.getElementById('bq-calib-result');
+  var tbody=document.getElementById('bq-tbody');
+  var countBadge=document.getElementById('bq-count-badge');
+  var countBadge2=document.getElementById('bq-count-badge-2');
+  var btnClearAll=document.getElementById('bq-btn-clear-all');
+  var btnReload=document.getElementById('bq-btn-reload');
+  var btnTabla=document.getElementById('bq-btn-tabla');
+  var btnPrint=document.getElementById('bq-btn-print');
+  var printImg=document.getElementById('bq-print-img');
+  var btnDownloadSheet=document.getElementById('bq-btn-download-sheet');
+  var metaFinca=document.getElementById('bq-meta-finca');
+  var metaLote=document.getElementById('bq-meta-lote');
+  var metaUbicacion=document.getElementById('bq-meta-ubicacion');
+  var metaFecha=document.getElementById('bq-meta-fecha');
+  var metaAreaAplic=document.getElementById('bq-meta-area-aplic');
+  var metaAngulo=document.getElementById('bq-meta-angulo');
+  var tableTextarea=document.getElementById('bq-table-textarea');
+  var btnDownloadCsv=document.getElementById('bq-btn-download-csv');
+  var lastSheetBlob=null;
+
+  var FONT='"Plus Jakarta Sans",sans-serif';
+
+  function todayISO(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+  // ---------- carga de imagen ----------
+  function loadFile(file){
+    if(!file||file.type.indexOf('image/')!==0)return;
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        state.img=img;state.naturalW=img.naturalWidth;state.naturalH=img.naturalHeight;
+        canvas.width=state.naturalW;canvas.height=state.naturalH;
+        state.blocks=[];state.active=[];state.activeParts=[];
+        state.editIndex=-1;state.editBackup=null;state.dragging=null;
+        editCard.style.display='none';
+        state.calib={armed:false,pts:[],pxPerMeter:null};
+        nextNumInput.value=1;
+        dropzone.style.display='none';
+        canvasWrap.style.display='block';
+        metaCard.style.display='block';
+        toolCard.style.display='block';
+        calibCard.style.display='block';
+        topbarActions.style.display='flex';
+        calibInputRow.style.display='none';
+        btnCalibClear.style.display='none';
+        calibResult.textContent='';
+        if(!metaFecha.value)metaFecha.value=todayISO();
+        redraw();renderTable();updateStatus();
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  pickBtn.addEventListener('click',function(){fileInput.click();});
+  fileInput.addEventListener('change',function(e){if(e.target.files&&e.target.files[0])loadFile(e.target.files[0]);});
+  ['dragover','dragenter'].forEach(function(evt){dropzone.addEventListener(evt,function(e){e.preventDefault();dropzone.classList.add('drag');});});
+  ['dragleave','dragend'].forEach(function(evt){dropzone.addEventListener(evt,function(e){dropzone.classList.remove('drag');});});
+  dropzone.addEventListener('drop',function(e){e.preventDefault();dropzone.classList.remove('drag');if(e.dataTransfer.files&&e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0]);});
+  btnReload.addEventListener('click',function(){fileInput.value='';fileInput.click();});
+
+  // ---------- coordenadas ----------
+  function eventToImageCoords(e){
+    var rect=canvas.getBoundingClientRect();
+    return [(e.clientX-rect.left)*(canvas.width/rect.width),(e.clientY-rect.top)*(canvas.height/rect.height)];
+  }
+
+  // ---------- geometría ----------
+  function polygonArea(pts){var a=0;for(var i=0;i<pts.length;i++){var p1=pts[i],p2=pts[(i+1)%pts.length];a+=p1[0]*p2[1]-p2[0]*p1[1];}return Math.abs(a)/2;}
+  function polygonCentroid(pts){
+    var a=0,cx=0,cy=0;
+    for(var i=0;i<pts.length;i++){var p1=pts[i],p2=pts[(i+1)%pts.length];var cross=p1[0]*p2[1]-p2[0]*p1[1];a+=cross;cx+=(p1[0]+p2[0])*cross;cy+=(p1[1]+p2[1])*cross;}
+    a=a/2;
+    if(Math.abs(a)<1e-6){var sx=0,sy=0;pts.forEach(function(p){sx+=p[0];sy+=p[1];});return [sx/pts.length,sy/pts.length];}
+    return [cx/(6*a),cy/(6*a)];
+  }
+  function colorForIndex(i){var hue=(i*137.508+18)%360;return {fill:'hsla('+hue+',68%,45%,0.30)',stroke:'hsl('+hue+',70%,38%)',solid:'hsl('+hue+',70%,30%)'};}
+  function blockPxArea(b){return b.parts.reduce(function(s,p){return s+polygonArea(p);},0);}
+  function blockAreaHa(b){if(!state.calib.pxPerMeter)return null;return blockPxArea(b)/(state.calib.pxPerMeter*state.calib.pxPerMeter)/10000;}
+  function totalAreaHa(){if(!state.calib.pxPerMeter)return null;return state.blocks.reduce(function(s,b){return s+blockAreaHa(b);},0);}
+
+  // ---------- dibujo compartido: foto + bloques cerrados (canvas en vivo Y hoja de impresión) ----------
+  function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+  function drawNumberBubble(c,center,label,fontSize,style,colors){
+    c.font='700 '+fontSize+'px '+FONT;c.textAlign='center';c.textBaseline='middle';
+    var padX=fontSize*0.55,padY=fontSize*0.32;
+    var rw=c.measureText(label).width+padX*2,rh=fontSize+padY*2;
+    roundRect(c,center[0]-rw/2,center[1]-rh/2,rw,rh,rh/2);
+    c.fillStyle='rgba(255,255,255,0.94)';c.fill();
+    c.lineWidth=Math.max(1,fontSize*0.07);
+    c.strokeStyle=style==='print'?'rgba(30,26,20,0.8)':colors.stroke;c.stroke();
+    c.fillStyle=style==='print'?'#201c15':colors.solid;
+    c.fillText(label,center[0],center[1]);
+  }
+  function drawAnnotated(c,dx,dy,dw,dh,style){
+    if(!state.img)return;
+    c.drawImage(state.img,dx,dy,dw,dh);
+    var sx=dw/state.naturalW,sy=dh/state.naturalH;
+    function tx(p){return [dx+p[0]*sx,dy+p[1]*sy];}
+    var lineW=Math.max(style==='print'?1.5:3,dw*(style==='print'?0.0018:0.0028));
+    var fontSize=Math.max(style==='print'?9:26,dw*(style==='print'?0.014:0.02));
+    state.blocks.forEach(function(b,i){
+      var colors=colorForIndex(i);
+      var hovered=style==='edit'&&i===state.hoverIndex;
+      b.parts.forEach(function(pts){
+        var tpts=pts.map(tx);
+        c.beginPath();tpts.forEach(function(p,j){j===0?c.moveTo(p[0],p[1]):c.lineTo(p[0],p[1]);});c.closePath();
+        if(style==='edit'){c.fillStyle=colors.fill;c.fill();c.lineWidth=hovered?lineW*1.8:lineW;c.strokeStyle=colors.stroke;}
+        else{c.lineWidth=lineW;c.strokeStyle='rgba(28,24,18,0.85)';}
+        c.stroke();
+        drawNumberBubble(c,tx(polygonCentroid(pts)),String(b.num),fontSize,style,colors);
+      });
+    });
+  }
+
+  // ---------- canvas en vivo ----------
+  function redraw(){
+    if(!state.img)return;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawAnnotated(ctx,0,0,canvas.width,canvas.height,'edit');
+    var lineW=Math.max(3,state.naturalW*0.0028);
+    if(state.activeParts.length){
+      ctx.fillStyle='rgba(230,201,79,0.22)';ctx.strokeStyle='#c9a83d';ctx.lineWidth=lineW;
+      state.activeParts.forEach(function(pts){ctx.beginPath();pts.forEach(function(p,j){j===0?ctx.moveTo(p[0],p[1]):ctx.lineTo(p[0],p[1]);});ctx.closePath();ctx.fill();ctx.stroke();});
+    }
+    if(state.active.length){
+      ctx.beginPath();state.active.forEach(function(p,j){j===0?ctx.moveTo(p[0],p[1]):ctx.lineTo(p[0],p[1]);});
+      ctx.strokeStyle='#e6c94f';ctx.lineWidth=lineW;ctx.setLineDash([lineW*2,lineW*1.4]);ctx.stroke();ctx.setLineDash([]);
+      state.active.forEach(function(p){ctx.beginPath();ctx.arc(p[0],p[1],lineW*1.6,0,Math.PI*2);ctx.fillStyle='#e6c94f';ctx.fill();ctx.strokeStyle='#5a4a10';ctx.lineWidth=lineW*0.4;ctx.stroke();});
+    }
+    if(state.calib.pts.length){
+      ctx.save();ctx.strokeStyle='#2f6fb0';ctx.fillStyle='#2f6fb0';ctx.lineWidth=lineW;
+      if(state.calib.pts.length===2){ctx.beginPath();ctx.moveTo(state.calib.pts[0][0],state.calib.pts[0][1]);ctx.lineTo(state.calib.pts[1][0],state.calib.pts[1][1]);ctx.stroke();}
+      state.calib.pts.forEach(function(p){ctx.beginPath();ctx.arc(p[0],p[1],lineW*1.6,0,Math.PI*2);ctx.fill();});
+      ctx.restore();
+    }
+    if(state.editIndex!==-1&&state.blocks[state.editIndex]){
+      var handleR=Math.max(lineW*2.2,state.naturalW*0.006);
+      state.blocks[state.editIndex].parts.forEach(function(pts){
+        ctx.beginPath();pts.forEach(function(p,j){j===0?ctx.moveTo(p[0],p[1]):ctx.lineTo(p[0],p[1]);});ctx.closePath();
+        ctx.strokeStyle='#ffffff';ctx.lineWidth=lineW*2.4;ctx.stroke();
+        ctx.strokeStyle='#1c1a17';ctx.lineWidth=lineW*1.1;ctx.stroke();
+        pts.forEach(function(v){ctx.beginPath();ctx.arc(v[0],v[1],handleR,0,Math.PI*2);ctx.fillStyle='#ffffff';ctx.fill();ctx.lineWidth=lineW*0.7;ctx.strokeStyle='#1c1a17';ctx.stroke();});
+      });
+    }
+  }
+
+  // ---------- editar bloques ya cerrados ----------
+  function startEdit(i){
+    if(state.editIndex!==-1)finishEdit();
+    state.editIndex=i;
+    state.editBackup=JSON.parse(JSON.stringify(state.blocks[i].parts));
+    canvas.style.cursor='grab';
+    editCard.style.display='block';
+    renderEditPanel();renderTable();redraw();
+  }
+  function finishEdit(){
+    state.editIndex=-1;state.dragging=null;state.editBackup=null;
+    canvas.style.cursor='crosshair';
+    editCard.style.display='none';
+    renderTable();redraw();
+  }
+  function cancelEdit(){if(state.editIndex===-1)return;state.blocks[state.editIndex].parts=state.editBackup;finishEdit();}
+  function renderEditPanel(){
+    if(state.editIndex===-1)return;
+    var b=state.blocks[state.editIndex];
+    editBadge.textContent='#'+b.num;
+    editPartsList.innerHTML='';
+    b.parts.forEach(function(pts,pi){
+      var row=document.createElement('div');row.className='bq-part-row';
+      var label=document.createElement('span');label.textContent='Pedazo '+(pi+1)+' — '+pts.length+' puntos';
+      row.appendChild(label);
+      if(b.parts.length>1){
+        var delPartBtn=document.createElement('button');delPartBtn.className='btn btn-ghost btn-sm';delPartBtn.textContent='Eliminar pedazo';
+        delPartBtn.addEventListener('click',function(){b.parts.splice(pi,1);renderEditPanel();renderTable();redraw();});
+        row.appendChild(delPartBtn);
+      }
+      editPartsList.appendChild(row);
+    });
+  }
+  btnEditDone.addEventListener('click',finishEdit);
+  btnEditCancel.addEventListener('click',cancelEdit);
+
+  function nearestVertex(pt){
+    if(state.editIndex===-1)return null;
+    var radius=state.naturalW*0.014,best=null;
+    state.blocks[state.editIndex].parts.forEach(function(pts,pi){
+      pts.forEach(function(v,vi){var d=Math.hypot(v[0]-pt[0],v[1]-pt[1]);if(d<=radius&&(!best||d<best.d))best={pi:pi,vi:vi,d:d};});
+    });
+    return best;
+  }
+  canvas.addEventListener('mousedown',function(e){if(state.editIndex===-1)return;var hit=nearestVertex(eventToImageCoords(e));if(hit){state.dragging=hit;e.preventDefault();}});
+  canvas.addEventListener('mousemove',function(e){if(!state.dragging||state.editIndex===-1)return;var pt=eventToImageCoords(e);state.blocks[state.editIndex].parts[state.dragging.pi][state.dragging.vi]=pt;redraw();});
+  window.addEventListener('mouseup',function(){if(state.dragging){state.dragging=null;renderTable();}});
+  canvas.addEventListener('contextmenu',function(e){
+    if(state.editIndex===-1)return;
+    e.preventDefault();
+    var hit=nearestVertex(eventToImageCoords(e));if(!hit)return;
+    var pts=state.blocks[state.editIndex].parts[hit.pi];
+    if(pts.length>3){pts.splice(hit.vi,1);redraw();renderEditPanel();renderTable();}
+    else{statusEl.textContent='Un pedazo necesita al menos 3 puntos — usá "Eliminar pedazo" si ya no lo necesitás.';}
+  });
+
+  // ---------- marcar bloques nuevos ----------
+  canvas.addEventListener('click',function(e){
+    if(state.editIndex!==-1)return;
+    var pt=eventToImageCoords(e);
+    if(state.calib.armed){
+      state.calib.pts.push(pt);
+      if(state.calib.pts.length===2){state.calib.armed=false;calibInputRow.style.display='flex';calibMetersInput.focus();}
+      redraw();return;
+    }
+    if(!state.img)return;
+    state.active.push(pt);redraw();updateStatus();
+  });
+  canvas.addEventListener('dblclick',function(e){if(state.editIndex!==-1)return;e.preventDefault();finishPart();});
+  document.addEventListener('keydown',function(e){
+    if(!state.img)return;
+    if(!document.getElementById('p-bloques').classList.contains('active'))return; // solo cuando esta pestaña está activa
+    var tag=(e.target&&e.target.tagName)||'';
+    if(tag==='INPUT'||tag==='TEXTAREA')return;
+    if(state.editIndex!==-1){if(e.key==='Escape')cancelEdit();else if(e.key==='Enter')finishEdit();return;}
+    if(e.key==='Enter'){finishBlock();}else if(e.key==='Escape'){cancelBlock();}else if(e.key==='Backspace'){undo();}
+  });
+
+  function finishPart(){
+    if(state.active.length<3){statusEl.textContent='Necesitás al menos 3 puntos para cerrar este pedazo.';return;}
+    state.activeParts.push(state.active.slice());state.active=[];redraw();updateStatus();
+  }
+  function finishBlock(){
+    if(state.active.length>=3){state.activeParts.push(state.active.slice());state.active=[];}
+    if(state.activeParts.length===0){statusEl.textContent='Marcá al menos un pedazo (mínimo 3 puntos) antes de cerrar el bloque.';return;}
+    var num=parseInt(nextNumInput.value,10);if(!num||isNaN(num))num=state.blocks.length+1;
+    state.blocks.push({num:num,plantas:null,parts:state.activeParts.slice()});
+    state.active=[];state.activeParts=[];nextNumInput.value=num+1;
+    redraw();renderTable();updateStatus();
+  }
+  function cancelBlock(){state.active=[];state.activeParts=[];redraw();updateStatus();}
+  function undo(){if(state.active.length>0){state.active.pop();}else if(state.activeParts.length>0){state.activeParts.pop();}redraw();updateStatus();}
+  btnFinishPart.addEventListener('click',finishPart);
+  btnFinish.addEventListener('click',finishBlock);
+  btnCancel.addEventListener('click',cancelBlock);
+  btnUndo.addEventListener('click',undo);
+
+  function updateStatus(){
+    var n=state.active.length,p=state.activeParts.length;
+    if(!state.img){statusEl.textContent='Cargá una foto para empezar a marcar bloques.';}
+    else if(n===0&&p===0){statusEl.textContent='Hacé clic sobre la foto para marcar las esquinas de un pedazo del bloque.';}
+    else{
+      var partsMsg=p>0?p+' pedazo'+(p===1?'':'s')+' cerrado'+(p===1?'':'s')+'. ':'';
+      var ptsMsg=n>0?n+' punto'+(n===1?'':'s')+' en el pedazo actual (doble clic cierra este pedazo). ':'';
+      statusEl.textContent=partsMsg+ptsMsg+'Enter cierra el bloque completo.';
+    }
+    btnFinishPart.disabled=n<3;
+    btnFinish.disabled=(p===0&&n<3);
+    btnUndo.disabled=(n===0&&p===0);
+    btnCancel.disabled=(n===0&&p===0);
+  }
+
+  // ---------- escala ----------
+  btnCalib.addEventListener('click',function(){state.calib.armed=true;state.calib.pts=[];calibInputRow.style.display='none';calibResult.textContent='Marcá los dos extremos de una distancia conocida sobre la foto.';});
+  btnCalibApply.addEventListener('click',function(){
+    var meters=parseFloat(calibMetersInput.value);
+    if(!meters||meters<=0||state.calib.pts.length<2)return;
+    var p1=state.calib.pts[0],p2=state.calib.pts[1];
+    state.calib.pxPerMeter=Math.hypot(p2[0]-p1[0],p2[1]-p1[1])/meters;
+    calibResult.textContent='Escala aplicada: '+state.calib.pxPerMeter.toFixed(1)+' px/m. Las áreas ahora se muestran en hectáreas.';
+    calibInputRow.style.display='none';btnCalibClear.style.display='';
+    redraw();renderTable();
+  });
+  btnCalibClear.addEventListener('click',function(){state.calib={armed:false,pts:[],pxPerMeter:null};calibResult.textContent='';btnCalibClear.style.display='none';redraw();renderTable();});
+
+  // ---------- tabla ----------
+  function renderTable(){
+    var n=state.blocks.length;
+    countBadge.textContent=n+' bloque'+(n===1?'':'s');
+    countBadge2.textContent=n;
+    tbody.innerHTML='';
+    if(!n){tbody.innerHTML='<tr class="bq-empty-row"><td colspan="5">Todavía no hay bloques marcados.</td></tr>';return;}
+    state.blocks.forEach(function(b,i){
+      var c=colorForIndex(i);
+      var tr=document.createElement('tr');
+      if(i===state.editIndex)tr.className='bq-editing-row';
+      tr.addEventListener('mouseenter',function(){state.hoverIndex=i;redraw();});
+      tr.addEventListener('mouseleave',function(){state.hoverIndex=-1;redraw();});
+
+      var tdNum=document.createElement('td');
+      var swatch=document.createElement('span');swatch.className='bq-swatch';swatch.style.background=c.solid;
+      var numInput=document.createElement('input');numInput.type='number';numInput.className='bq-num-input';numInput.value=b.num;
+      numInput.addEventListener('change',function(){var v=parseInt(numInput.value,10);b.num=isNaN(v)?b.num:v;redraw();});
+      tdNum.appendChild(swatch);tdNum.appendChild(numInput);
+      if(b.parts.length>1){var mark=document.createElement('span');mark.className='bq-parts-mark';mark.textContent='×'+b.parts.length;mark.title=b.parts.length+' pedazos separados';tdNum.appendChild(mark);}
+
+      var ha=blockAreaHa(b);
+      var tdArea=document.createElement('td');tdArea.textContent=ha?ha.toFixed(2)+' ha':'—';
+
+      var tdPlantas=document.createElement('td');
+      var plantasInput=document.createElement('input');plantasInput.type='number';plantasInput.min='0';plantasInput.className='bq-num-input';plantasInput.style.width='54px';plantasInput.placeholder='—';
+      plantasInput.value=b.plantas!=null?b.plantas:'';
+      plantasInput.addEventListener('change',function(){var v=parseInt(plantasInput.value,10);b.plantas=isNaN(v)?null:v;renderTable();});
+      tdPlantas.appendChild(plantasInput);
+
+      var tdDens=document.createElement('td');
+      var dens=(ha&&b.plantas)?Math.round(b.plantas/ha):null;
+      tdDens.textContent=dens?dens.toLocaleString('es-CR'):'—';
+
+      var tdActions=document.createElement('td');tdActions.style.whiteSpace='nowrap';
+      var editBtn=document.createElement('button');editBtn.className='btn btn-ghost btn-sm';editBtn.textContent=i===state.editIndex?'Listo':'Editar';editBtn.title='Ajustar la forma de este bloque';
+      editBtn.addEventListener('click',function(){if(i===state.editIndex)finishEdit();else startEdit(i);});
+      var delBtn=document.createElement('button');delBtn.className='btn btn-ghost btn-sm';delBtn.textContent='✕';delBtn.title='Eliminar bloque';delBtn.style.marginLeft='4px';
+      delBtn.addEventListener('click',function(){if(i===state.editIndex)finishEdit();state.blocks.splice(i,1);redraw();renderTable();});
+      tdActions.appendChild(editBtn);tdActions.appendChild(delBtn);
+
+      tr.appendChild(tdNum);tr.appendChild(tdArea);tr.appendChild(tdPlantas);tr.appendChild(tdDens);tr.appendChild(tdActions);
+      tbody.appendChild(tr);
+    });
+  }
+  btnClearAll.addEventListener('click',function(){
+    if(!state.blocks.length)return;
+    if(!window.confirm('¿Borrar los '+state.blocks.length+' bloques marcados?'))return;
+    if(state.editIndex!==-1)finishEdit();
+    state.blocks=[];redraw();renderTable();
+  });
+
+  // ---------- exportar: descargas reales (esta página no está en un sandbox, sí funcionan) ----------
+  function bqDownload(filename,blob){
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},30000);
+  }
+  function buildTableRows(){
+    var rows=[['Bloque','Pedazos','Area_ha','Plantas','Densidad_pl_ha']];
+    state.blocks.slice().sort(function(a,b){return a.num-b.num;}).forEach(function(b){
+      var ha=blockAreaHa(b);
+      var dens=(ha&&b.plantas)?Math.round(b.plantas/ha):'';
+      rows.push([b.num,b.parts.length,ha?ha.toFixed(3):'',b.plantas!=null?b.plantas:'',dens]);
+    });
+    return rows;
+  }
+  btnTabla.addEventListener('click',function(){
+    var rows=buildTableRows();
+    tableTextarea.value=rows.map(function(r){return r.join('\t');}).join('\n'); // tabs: pega directo como columnas en Excel/Sheets
+    document.getElementById('modal-bq-tabla').classList.add('open');
+    tableTextarea.focus();tableTextarea.select();
+  });
+  btnDownloadCsv.addEventListener('click',function(){
+    var csv=buildTableRows().map(function(r){return r.join(',');}).join('\n');
+    bqDownload('bloques.csv',new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+    toast('✅ Tabla descargada');
+  });
+
+  // ---------- hoja de impresión ----------
+  function drawInfoBox(c,x,y,w,h,rows){
+    c.strokeStyle='#3a352a';c.lineWidth=1.5;c.strokeRect(x,y,w,h);
+    var headH=30;
+    c.fillStyle='#c1603f';c.font='700 15px '+FONT;c.textAlign='center';c.textBaseline='middle';
+    c.fillText('INFORMACIÓN GENERAL',x+w/2,y+headH/2);
+    c.strokeStyle='#c9c2ae';c.beginPath();c.moveTo(x,y+headH);c.lineTo(x+w,y+headH);c.stroke();
+    var keys=Object.keys(rows),rowH=(h-headH)/keys.length;
+    keys.forEach(function(k,i){
+      var ry=y+headH+i*rowH;
+      if(i>0){c.strokeStyle='#e2ddcd';c.beginPath();c.moveTo(x,ry);c.lineTo(x+w,ry);c.stroke();}
+      c.fillStyle='#5c5648';c.font='400 14px '+FONT;c.textAlign='left';c.fillText(k,x+12,ry+rowH/2);
+      c.fillStyle='#1c1a17';c.font='700 14px '+FONT;c.textAlign='right';c.fillText(String(rows[k]),x+w-12,ry+rowH/2);
+    });
+  }
+  function drawBlocksTable(c,x,y,w,h){
+    var headers=['Bloque','Área (ha)','Plantas','Densidad'];
+    var colW=[w*0.20,w*0.28,w*0.26,w*0.26];
+    var n=state.blocks.length;
+    var rowH=Math.min(26,Math.max(11,(h-30)/(n+2)));
+    c.textBaseline='middle';
+    c.fillStyle='#efece1';c.fillRect(x,y,w,rowH);c.strokeStyle='#3a352a';c.strokeRect(x,y,w,rowH);
+    c.fillStyle='#1c1a17';c.font='700 '+Math.min(13,rowH*0.55)+'px '+FONT;c.textAlign='left';
+    var cx=x;headers.forEach(function(hd,i){c.fillText(hd,cx+8,y+rowH/2);cx+=colW[i];});
+    var sorted=state.blocks.slice().sort(function(a,b){return a.num-b.num;});
+    var totalHa=0,totalPlantasSum=0;
+    sorted.forEach(function(b,i){
+      var ry=y+rowH*(i+1);
+      c.strokeStyle='#e2ddcd';c.strokeRect(x,ry,w,rowH);
+      var ha=blockAreaHa(b),plantas=b.plantas||null;
+      var dens=(ha&&plantas)?Math.round(plantas/ha):null;
+      if(ha)totalHa+=ha;if(plantas)totalPlantasSum+=plantas;
+      var vals=[String(b.num),ha?ha.toFixed(2):'—',plantas?String(plantas):'—',dens?String(dens):'—'];
+      c.font='400 '+Math.min(12.5,rowH*0.5)+'px '+FONT;c.fillStyle='#262420';
+      var cx2=x;vals.forEach(function(v,j){c.fillText(v,cx2+8,ry+rowH/2);cx2+=colW[j];});
+    });
+    var ty=y+rowH*(sorted.length+1);
+    c.fillStyle='#efece1';c.fillRect(x,ty,w,rowH);c.strokeStyle='#3a352a';c.strokeRect(x,ty,w,rowH);
+    var totalDens=(totalHa&&totalPlantasSum)?Math.round(totalPlantasSum/totalHa):null;
+    var totVals=['Total',totalHa?totalHa.toFixed(2):'—',totalPlantasSum?String(totalPlantasSum):'—',totalDens?String(totalDens):'—'];
+    c.font='700 '+Math.min(12.5,rowH*0.5)+'px '+FONT;c.fillStyle='#1c1a17';
+    var cx3=x;totVals.forEach(function(v,j){c.fillText(v,cx3+8,ty+rowH/2);cx3+=colW[j];});
+  }
+  function drawNorthArrow(c,cx,cy,size,angleDeg){
+    c.save();c.translate(cx,cy);c.rotate(angleDeg*Math.PI/180);
+    c.beginPath();c.moveTo(0,-size/2);c.lineTo(size*0.32,size/2);c.lineTo(0,size*0.22);c.lineTo(-size*0.32,size/2);c.closePath();
+    c.fillStyle='#1c1a17';c.fill();c.restore();
+    c.fillStyle='#1c1a17';c.font='700 15px '+FONT;c.textAlign='center';c.fillText('N',cx,cy-size/2-12);
+  }
+  function drawScaleBar(c,x,y,pxPerMeterAtScale){
+    var niceValues=[1,2,5,10,20,25,50,100,150,200,250,300,500,750,1000,1500,2000,2500,5000,10000];
+    var estMeters=220/pxPerMeterAtScale;
+    var meters=niceValues.reduce(function(best,v){return Math.abs(v-estMeters)<Math.abs(best-estMeters)?v:best;},niceValues[0]);
+    var barPx=meters*pxPerMeterAtScale,seg=barPx/4;
+    c.textAlign='center';c.textBaseline='alphabetic';
+    for(var i=0;i<4;i++){c.fillStyle=i%2===0?'#1c1a17':'#ffffff';c.fillRect(x+seg*i,y,seg,10);c.strokeStyle='#1c1a17';c.lineWidth=1;c.strokeRect(x+seg*i,y,seg,10);}
+    c.fillStyle='#1c1a17';c.font='400 11px '+FONT;
+    for(var j=0;j<=4;j++){c.fillText(String(Math.round(meters*j/4)),x+seg*j,y+24);}
+    c.fillText('metros',x+barPx/2,y+40);
+  }
+  function generatePrintSheet(){
+    if(!state.img)return;
+    var PAGE_W=2200,PAGE_H=1650;
+    var page=document.createElement('canvas');page.width=PAGE_W;page.height=PAGE_H;
+    var pctx=page.getContext('2d');
+    pctx.fillStyle='#ffffff';pctx.fillRect(0,0,PAGE_W,PAGE_H);
+    pctx.strokeStyle='#222';pctx.lineWidth=3;pctx.strokeRect(18,18,PAGE_W-36,PAGE_H-36);
+
+    var finca=(metaFinca.value||'').trim()||'Finca';
+    var lote=(metaLote.value||'').trim()||'Lote';
+    var ubicacion=(metaUbicacion.value||'').trim();
+    var fecha=metaFecha.value||'';
+    var northAngle=parseFloat(metaAngulo.value)||0;
+
+    pctx.textAlign='center';pctx.textBaseline='alphabetic';pctx.fillStyle='#1c1a17';
+    pctx.font='700 34px '+FONT;pctx.fillText(finca,PAGE_W/2,62);
+    pctx.font='400 24px '+FONT;pctx.fillText(lote,PAGE_W/2,96);
+    drawNorthArrow(pctx,PAGE_W-90,78,46,northAngle);
+
+    var headerBottom=140;
+    var leftX=40,leftW=Math.round(PAGE_W*0.30);
+    var rightX=leftX+leftW+30,rightW=PAGE_W-40-rightX;
+    var bodyBottom=PAGE_H-40;
+
+    var infoTop=headerBottom,infoH=150;
+    var totHa=totalAreaHa();
+    var areaAplicVal=metaAreaAplic.value?parseFloat(metaAreaAplic.value):totHa;
+    drawInfoBox(pctx,leftX,infoTop,leftW,infoH,{
+      'Área total':(totHa!=null?totHa.toFixed(2):'—')+' ha',
+      'Área de aplicación':(areaAplicVal!=null?Number(areaAplicVal).toFixed(2):'—')+' ha',
+      'Ubicación':ubicacion||'—',
+      'Fecha':fecha||'—'
+    });
+    drawBlocksTable(pctx,leftX,infoTop+infoH+24,leftW,bodyBottom-(infoTop+infoH+24));
+
+    var photoBoxY=headerBottom,photoBoxH=bodyBottom-headerBottom;
+    var hasScale=!!state.calib.pxPerMeter;
+    var scaleBarH=hasScale?60:26;
+    var photoH=photoBoxH-scaleBarH;
+    var arImg=state.naturalW/state.naturalH;
+    var pw=rightW,ph=pw/arImg;
+    if(ph>photoH){ph=photoH;pw=ph*arImg;}
+    var px=rightX+(rightW-pw)/2,py=photoBoxY+(photoH-ph)/2;
+    drawAnnotated(pctx,px,py,pw,ph,'print');
+    pctx.strokeStyle='#333';pctx.lineWidth=2;pctx.strokeRect(px,py,pw,ph);
+
+    if(hasScale){
+      drawScaleBar(pctx,px,photoBoxY+photoH+16,state.calib.pxPerMeter*(pw/state.naturalW));
+    }else{
+      pctx.fillStyle='#8a8272';pctx.font='italic 15px '+FONT;pctx.textAlign='left';
+      pctx.fillText('Escala no calibrada — usá "Escala" en el panel para tener hectáreas y barra de escala reales.',px,photoBoxY+photoH+20);
+    }
+
+    page.toBlob(function(blob){
+      if(!blob)return;
+      lastSheetBlob=blob;
+      if(printImg.dataset.url)URL.revokeObjectURL(printImg.dataset.url);
+      var url=URL.createObjectURL(blob);
+      printImg.dataset.url=url;printImg.src=url;
+      document.getElementById('modal-bq-hoja').classList.add('open');
+    },'image/png');
+  }
+  btnPrint.addEventListener('click',generatePrintSheet);
+  btnDownloadSheet.addEventListener('click',function(){
+    if(!lastSheetBlob)return;
+    var name=((metaFinca.value||'finca')+'-'+(metaLote.value||'lote')).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+    bqDownload((name||'hoja-bloques')+'.png',lastSheetBlob);
+    toast('✅ Hoja descargada');
+  });
+
+  updateStatus();
+}
 
 // ══════════════════════════════════════════
 // ── MIS FINANZAS PERSONAL · v6 ──
