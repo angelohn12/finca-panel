@@ -697,7 +697,8 @@ nav>*{position:relative;z-index:1;}
         <button class="btn btn-ghost btn-sm" id="bq-btn-cancel" disabled>Cancelar bloque</button>
       </div>
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-        <p class="bq-status" id="bq-status" style="margin:0;min-height:0;flex:1 1 260px">Cargá una foto para empezar a marcar bloques.</p>
+        <p class="bq-status" id="bq-status" style="margin:0;min-height:0;flex:1 1 200px">Cargá una foto para empezar a marcar bloques.</p>
+        <div class="bq-field-row" style="margin-bottom:0"><label for="bq-label-scale">Tamaño de número</label><input type="range" id="bq-label-scale" min="40" max="150" value="100" style="width:100px"><span id="bq-label-scale-val" style="font-size:11px;color:var(--ink4);width:34px">100%</span></div>
         <div class="bq-field-row" style="margin-bottom:0"><label for="bq-next-num">Próximo número</label><input type="number" id="bq-next-num" class="fi bq-narrow" min="1" value="1"></div>
       </div>
     </div>
@@ -1175,7 +1176,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.08.16.1';
+var APP_VERSION='2026.08.16.2';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -3642,7 +3643,8 @@ function initBloques(){
     activeParts:[],      // pedazos ya cerrados, esperando a cerrarse como bloque
     hoverIndex:-1,
     editIndex:-1,editBackup:null,dragging:null,
-    calib:{armed:false,pts:[],pxPerMeter:null}
+    calib:{armed:false,pts:[],pxPerMeter:null},
+    labelScale:1  // 0.4-1.5, ajustable por el usuario para que los números no se amontonen
   };
 
   var canvas=document.getElementById('bq-canvas');
@@ -3657,6 +3659,8 @@ function initBloques(){
   var topbarActions=document.getElementById('bq-topbar-actions');
   var statusEl=document.getElementById('bq-status');
   var nextNumInput=document.getElementById('bq-next-num');
+  var labelScaleInput=document.getElementById('bq-label-scale');
+  var labelScaleVal=document.getElementById('bq-label-scale-val');
   var btnFinishPart=document.getElementById('bq-btn-finish-part');
   var btnFinish=document.getElementById('bq-btn-finish');
   var btnUndo=document.getElementById('bq-btn-undo');
@@ -3765,13 +3769,19 @@ function initBloques(){
     c.fillStyle=style==='print'?'#201c15':colors.solid;
     c.fillText(label,center[0],center[1]);
   }
+  function bboxMinDim(pts){
+    var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    pts.forEach(function(p){if(p[0]<minX)minX=p[0];if(p[0]>maxX)maxX=p[0];if(p[1]<minY)minY=p[1];if(p[1]>maxY)maxY=p[1];});
+    return Math.min(maxX-minX,maxY-minY);
+  }
   function drawAnnotated(c,dx,dy,dw,dh,style){
     if(!state.img)return;
     c.drawImage(state.img,dx,dy,dw,dh);
     var sx=dw/state.naturalW,sy=dh/state.naturalH;
     function tx(p){return [dx+p[0]*sx,dy+p[1]*sy];}
     var lineW=Math.max(style==='print'?1.5:3,dw*(style==='print'?0.0018:0.0028));
-    var fontSize=Math.max(style==='print'?9:14,dw*(style==='print'?0.014:0.011));
+    var scale=state.labelScale||1;
+    var baseFontSize=Math.max(style==='print'?9:14,dw*(style==='print'?0.014:0.011))*scale;
     state.blocks.forEach(function(b,i){
       var colors=colorForIndex(i);
       var hovered=style==='edit'&&i===state.hoverIndex;
@@ -3781,6 +3791,9 @@ function initBloques(){
         if(style==='edit'){c.fillStyle=colors.fill;c.fill();c.lineWidth=hovered?lineW*1.8:lineW;c.strokeStyle=colors.stroke;}
         else{c.lineWidth=lineW;c.strokeStyle='rgba(28,24,18,0.85)';}
         c.stroke();
+        // en bloques angostos o muy juntos, la burbuja no puede pasar del tamaño del propio pedazo
+        var fitCap=Math.max(7,bboxMinDim(tpts)*0.62);
+        var fontSize=Math.min(baseFontSize,fitCap);
         drawNumberBubble(c,tx(polygonCentroid(pts)),String(b.num),fontSize,style,colors);
       });
     });
@@ -3914,6 +3927,11 @@ function initBloques(){
   btnFinish.addEventListener('click',finishBlock);
   btnCancel.addEventListener('click',cancelBlock);
   btnUndo.addEventListener('click',undo);
+  labelScaleInput.addEventListener('input',function(){
+    state.labelScale=parseInt(labelScaleInput.value,10)/100;
+    labelScaleVal.textContent=labelScaleInput.value+'%';
+    redraw();
+  });
 
   function updateStatus(){
     var n=state.active.length,p=state.activeParts.length;
