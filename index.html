@@ -689,6 +689,18 @@ nav>*{position:relative;z-index:1;}
       <div class="ct">Foto aérea</div>
       <div class="bq-badge" id="bq-count-badge">0 bloques</div>
     </div>
+    <div id="bq-tool-card" style="display:none;padding:10px 16px;border-bottom:1px solid var(--border);background:linear-gradient(to right,var(--fog),var(--card))">
+      <div class="bq-tool-row">
+        <button class="btn btn-ghost btn-sm" id="bq-btn-finish-part" disabled>Cerrar pedazo</button>
+        <button class="btn btn-primary btn-sm" id="bq-btn-finish" disabled>Cerrar bloque</button>
+        <button class="btn btn-ghost btn-sm" id="bq-btn-undo" disabled>Deshacer</button>
+        <button class="btn btn-ghost btn-sm" id="bq-btn-cancel" disabled>Cancelar bloque</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <p class="bq-status" id="bq-status" style="margin:0;min-height:0;flex:1 1 260px">Cargá una foto para empezar a marcar bloques.</p>
+        <div class="bq-field-row" style="margin-bottom:0"><label for="bq-next-num">Próximo número</label><input type="number" id="bq-next-num" class="fi bq-narrow" min="1" value="1"></div>
+      </div>
+    </div>
     <div id="bq-stage">
       <div class="bq-dropzone" id="bq-dropzone">
         <div class="bq-dz-icon">📍</div>
@@ -720,22 +732,6 @@ nav>*{position:relative;z-index:1;}
           <div class="bq-field-row"><label for="bq-meta-fecha">Fecha</label><input type="date" id="bq-meta-fecha" class="fi" style="width:auto"></div>
           <div class="bq-field-row"><label for="bq-meta-area-aplic">Área aplic. (ha)</label><input type="number" id="bq-meta-area-aplic" class="fi bq-narrow" min="0" step="0.01" placeholder="= total"></div>
           <div class="bq-field-row"><label for="bq-meta-angulo">Ángulo norte (°)</label><input type="number" id="bq-meta-angulo" class="fi bq-narrow" value="0" step="1"></div>
-        </div>
-      </div>
-
-      <div class="card" id="bq-tool-card" style="display:none">
-        <div class="ch"><div class="ct">Dibujar bloque</div></div>
-        <div class="cb">
-          <div class="bq-tool-row">
-            <button class="btn btn-ghost btn-sm" id="bq-btn-finish-part" disabled>Cerrar pedazo</button>
-            <button class="btn btn-primary btn-sm" id="bq-btn-finish" disabled>Cerrar bloque</button>
-          </div>
-          <div class="bq-tool-row">
-            <button class="btn btn-ghost btn-sm" id="bq-btn-undo" disabled>Deshacer</button>
-            <button class="btn btn-ghost btn-sm" id="bq-btn-cancel" disabled>Cancelar bloque</button>
-          </div>
-          <p class="bq-status" id="bq-status">Cargá una foto para empezar a marcar bloques.</p>
-          <div class="bq-field-row"><label for="bq-next-num">Próximo número</label><input type="number" id="bq-next-num" class="fi bq-narrow" min="1" value="1"></div>
         </div>
       </div>
 
@@ -1179,7 +1175,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.08.15.3';
+var APP_VERSION='2026.08.16.1';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -3775,7 +3771,7 @@ function initBloques(){
     var sx=dw/state.naturalW,sy=dh/state.naturalH;
     function tx(p){return [dx+p[0]*sx,dy+p[1]*sy];}
     var lineW=Math.max(style==='print'?1.5:3,dw*(style==='print'?0.0018:0.0028));
-    var fontSize=Math.max(style==='print'?9:26,dw*(style==='print'?0.014:0.02));
+    var fontSize=Math.max(style==='print'?9:14,dw*(style==='print'?0.014:0.011));
     state.blocks.forEach(function(b,i){
       var colors=colorForIndex(i);
       var hovered=style==='edit'&&i===state.hoverIndex;
