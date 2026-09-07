@@ -1213,7 +1213,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.09.06.2';
+var APP_VERSION='2026.09.06.3';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1447,6 +1447,7 @@ function calcCalibresTotal(){
 function guardarCalibres(){
   var total=APP_CALIBRES.reduce(function(s,c){return s+(parseFloat(c.pct)||0);},0);
   if(Math.abs(total-100)>1){toast('⚠ El % de calibres debe sumar 100%',true);return;}
+  if(!CONFIG_CARGADA){toast('⚠ Todavía no se leyó la hoja Config. Recargá antes de guardar, o se borrarían los lotes.',true);return;}
   cerrarModal('modal-calibres');
   toast('⏳ Guardando…');
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
@@ -1464,9 +1465,28 @@ var APP={proyectos:[],tx:[],papelera:[],lotes:[],nextId:1,nextProjId:1};
 var TIPO='Gasto';
 var editandoProjId=null;
 
+// ── SEGURIDAD: escapar texto antes de meterlo en HTML ────────────────────
+// Todo lo que se escribe (nombre de lote, arrendante, descripción de un
+// movimiento...) se guarda en Sheets y luego se vuelve a pintar con innerHTML.
+// Sin escapar, un texto con etiquetas HTML se ejecutaría como código en el
+// navegador del otro socio — y la llave de la API vive en sessionStorage, así
+// que un script inyectado podría robarla. esc() lo neutraliza.
+var ESC_MAP={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+function esc(v){
+  return String(v==null?'':v).replace(/[&<>"']/g,function(c){return ESC_MAP[c];});
+}
+
 function saveL(){try{localStorage.setItem('jorisu_v3',JSON.stringify(APP));}catch(e){}}
 function loadL(){
-  try{var r=localStorage.getItem('jorisu_v3');if(r){var d=JSON.parse(r);APP.proyectos=d.proyectos||[];APP.tx=d.tx||[];APP.nextId=d.nextId||1;APP.nextProjId=d.nextProjId||1;}}catch(e){}
+  // saveL() guarda TODO el objeto APP, pero antes esta función solo devolvía
+  // proyectos y movimientos: al recargar sin internet, el mapa aparecía vacío
+  // aunque los lotes estuvieran en el respaldo local. Ahora también vuelven
+  // los lotes y las fincas.
+  try{var r=localStorage.getItem('jorisu_v3');if(r){var d=JSON.parse(r);
+    APP.proyectos=d.proyectos||[];APP.tx=d.tx||[];APP.nextId=d.nextId||1;APP.nextProjId=d.nextProjId||1;
+    if(Array.isArray(d.lotes))APP.lotes=d.lotes;
+    if(Array.isArray(d.fincas)&&d.fincas.length)APP.fincas=d.fincas;
+  }}catch(e){}
 }
 
 // ── CONTROL DE DUPLICADOS EN SYNC ──
@@ -1874,7 +1894,7 @@ function renderPortafolio(){
 
     h+='<div class="proj-wrap">';
     h+='<div class="proj-hd" style="background:linear-gradient(135deg,'+darken(p.color)+','+p.color+')">';
-    h+='<div><div class="proj-title">🌿 '+p.nombre+'</div>';
+    h+='<div><div class="proj-title">🌿 '+esc(p.nombre)+'</div>';
     h+='<div class="proj-sub">'+p.ha+' ha · '+p.cultivo+(p.ciclo==='PC'?(' · Semilla '+(p.tipoSemilla==='guia'?'guía/axilar':'corona')):'')+(p.siembra?' · Siembra: '+p.siembra:'')+(p.sociedad?' · '+p.sociedad:'')+'</div></div>';
     h+='<div class="proj-actions">';
     h+='<span class="act-badge '+(p.activo?'badge-activo':'badge-planeado')+'">'+(p.activo?p.ciclo+' · Activo':'Planeado')+'</span>';
@@ -1943,7 +1963,7 @@ function renderPortafolio(){
       var col=TONE_PALETTE[si%TONE_PALETTE.length];
       h+='<div class="dist-row">';
       h+='<div class="avatar" style="background:'+col+'">'+initials(s.nombre)+'</div>';
-      h+='<div class="di"><div class="dn">'+s.nombre+'</div><div class="dp">'+s.pctGanancia+'% ganancia'+(s.aporte>0?' · aportó $'+s.aporte.toLocaleString('es-CR'):'')+'</div></div>';
+      h+='<div class="di"><div class="dn">'+esc(s.nombre)+'</div><div class="dp">'+s.pctGanancia+'% ganancia'+(s.aporte>0?' · aportó $'+s.aporte.toLocaleString('es-CR'):'')+'</div></div>';
       h+='<div class="dm"><div class="dmv" style="color:'+col+'">$'+Math.round(m).toLocaleString('es-CR')+'</div><div class="dms">'+(esReal?'real':'proyectado')+'</div></div></div>';
     });
     h+='</div></div>';
@@ -1951,7 +1971,7 @@ function renderPortafolio(){
     p.socios.forEach(function(s){
       var col=s.color||stringToColor(s.nombre);
       h+='<div class="dist-row"><div class="avatar" style="background:'+col+'">'+initials(s.nombre)+'</div>';
-      h+='<div class="di"><div class="dn">'+s.nombre+'</div><div class="dp">'+s.pctGanancia+'% ganancia</div></div>';
+      h+='<div class="di"><div class="dn">'+esc(s.nombre)+'</div><div class="dp">'+s.pctGanancia+'% ganancia</div></div>';
       h+='<div class="dm"><div class="dmv" style="color:'+col+'">$'+(s.aporte||0).toLocaleString('es-CR')+'</div><div class="dms">aporte</div></div></div>';
     });
     h+='</div></div></div></div></div>';
@@ -1974,7 +1994,7 @@ function refreshProyecto(pid){
     p.socios.forEach(function(s){
       var m=Math.max(0,ganN*(s.pctGanancia/100));var col=s.color||stringToColor(s.nombre);
       dh+='<div class="dist-row"><div class="avatar" style="background:'+col+'">'+initials(s.nombre)+'</div>';
-      dh+='<div class="di"><div class="dn">'+s.nombre+'</div><div class="dp">'+s.pctGanancia+'% ganancia'+(s.aporte>0?' · aportó $'+s.aporte.toLocaleString('es-CR'):'')+'</div></div>';
+      dh+='<div class="di"><div class="dn">'+esc(s.nombre)+'</div><div class="dp">'+s.pctGanancia+'% ganancia'+(s.aporte>0?' · aportó $'+s.aporte.toLocaleString('es-CR'):'')+'</div></div>';
       dh+='<div class="dm"><div class="dmv" style="color:'+col+'">$'+Math.round(m).toLocaleString('es-CR')+'</div><div class="dms">proyectado</div></div></div>';
     });
     de.innerHTML=dh;
@@ -2045,7 +2065,7 @@ function poblarSelectProyectos(){
     var el=document.getElementById(id);if(!el)return;
     var val=el.value;
     el.innerHTML='<option value="">Todos los proyectos</option>';
-    APP.proyectos.forEach(function(p){el.innerHTML+='<option value="'+p.id+'">'+p.nombre+'</option>';});
+    APP.proyectos.forEach(function(p){el.innerHTML+='<option value="'+p.id+'">'+esc(p.nombre)+'</option>';});
     if(val)el.value=val;
   });
 }
@@ -2095,7 +2115,7 @@ function renderTx(){
     var pnombre=APP.proyectos.find(function(p){return p.id===t.projId;});
     h+='<div class="tx-row"><span class="tx-f">'+fmtFechaCorta(t.fecha)+'</span>';
     h+='<span class="txb '+cb+'">'+t.tipo+'</span>';
-    h+='<div><div class="tx-d">'+t.desc+'</div><div class="tx-s">'+(t.proveedor||'')+(pnombre?' · '+pnombre.nombre:'')+'</div></div>';
+    h+='<div><div class="tx-d">'+esc(t.desc)+'</div><div class="tx-s">'+esc(t.proveedor||'')+(pnombre?' · '+esc(pnombre.nombre):'')+'</div></div>';
     h+='<span style="font-size:11px;color:var(--ink3)">'+(t.cat||'')+'</span>';
     h+='<span style="font-size:10px;font-weight:700;font-family:JetBrains Mono,monospace;color:var(--ink4)">'+(t.cosecha||'')+'</span>';
     h+='<span class="tx-m '+cm+'">'+montoDualTexto(t)+'</span>';
@@ -2159,7 +2179,7 @@ function renderPapelera(){
   lista.forEach(function(t){
     var fecha=t.eliminadoEn?new Date(t.eliminadoEn).toLocaleString('es-CR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
     h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">';
-    h+='<div style="flex:1"><div style="font-size:13px;font-weight:700">'+t.desc+'</div>';
+    h+='<div style="flex:1"><div style="font-size:13px;font-weight:700">'+esc(t.desc)+'</div>';
     h+='<div style="font-size:11px;color:var(--ink4)">'+fmtFechaCorta(t.fecha)+' · $'+parseFloat(t.monto).toLocaleString('es-CR')+' · borrado por '+(t.eliminadoPor||'?')+' el '+fecha+'</div></div>';
     h+='<button class="btn btn-ghost btn-sm" onclick="restaurarTx('+t.id+')">↩ Restaurar</button>';
     h+='</div>';
@@ -2461,7 +2481,7 @@ function renderMiVista(){
     h+='<div class="proj-row-anyelo">';
     h+='<div class="proj-row-hd">';
     h+='<div>';
-    h+='<div style="font-size:13px;font-weight:800;color:var(--forest)">'+p.nombre+'</div>';
+    h+='<div style="font-size:13px;font-weight:800;color:var(--forest)">'+esc(p.nombre)+'</div>';
     h+='<div style="font-size:11px;color:var(--ink4);margin-top:2px">'+p.ha+' ha · '+p.cultivo+' · Tu participación: <strong>'+s.pctGanancia+'%</strong> ganancia</div>';
     h+='</div>';
     h+='<div style="text-align:right">'+mesBadge+'</div>';
@@ -2576,7 +2596,7 @@ function renderMiVista(){
     var pctProy=Math.round((tuProy/maxVal)*100);
     var pctReal=ingR>0?Math.round((tuReal/maxVal)*100):0;
     vsH+='<div class="vs-row">';
-    vsH+='<div class="vs-label">'+p.nombre+'<div style="font-size:10px;color:var(--ink4);font-weight:400">'+s.pctGanancia+'% de la ganancia</div></div>';
+    vsH+='<div class="vs-label">'+esc(p.nombre)+'<div style="font-size:10px;color:var(--ink4);font-weight:400">'+s.pctGanancia+'% de la ganancia</div></div>';
     vsH+='<div class="vs-bar-wrap">';
     vsH+='<div style="font-size:10px;color:var(--ink4);margin-bottom:3px">Proyectado</div>';
     vsH+='<div class="vs-bar-bg"><div class="vs-bar-proy" style="width:'+pctProy+'%"></div></div>';
@@ -2743,7 +2763,7 @@ function renderDocProyectos(){
   el.innerHTML=APP.proyectos.map(function(p){
     return '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer">'+
       '<input type="checkbox" class="doc-proj-check" value="'+p.id+'" checked>'+
-      '<span>'+p.nombre+' <span style="color:var(--ink4)">· '+p.ha+' ha · '+(p.siembra?('siembra '+fmtSiembraCorta(p.siembra)):'sin fecha de siembra')+'</span></span>'+
+      '<span>'+esc(p.nombre)+' <span style="color:var(--ink4)">· '+p.ha+' ha · '+(p.siembra?('siembra '+fmtSiembraCorta(p.siembra)):'sin fecha de siembra')+'</span></span>'+
       '</label>';
   }).join('');
 }
@@ -2877,7 +2897,7 @@ function generarDocumentoFinanciero(){
   var descProyectos=proyectos.map(function(p){
     var fCosecha=calcFechaCosechaEstimada(p);
     var fCosechaTxt=fCosecha?(MESES_CORTOS[fCosecha.getMonth()]+'. '+fCosecha.getFullYear()):'sin definir';
-    return '<p><b>'+p.nombre+'</b> — '+p.ha+' ha, cultivo de '+p.cultivo+'. '+(p.siembra?('Siembra: '+fmtSiembraCorta(p.siembra)+'. '):'')+
+    return '<p><b>'+esc(p.nombre)+'</b> — '+p.ha+' ha, cultivo de '+p.cultivo+'. '+(p.siembra?('Siembra: '+fmtSiembraCorta(p.siembra)+'. '):'')+
       'Cosecha estimada: '+fCosechaTxt+'. Inversión proyectada del ciclo: <b>$'+Math.round(p.inv).toLocaleString('en-US')+'</b>. '+
       'Ingreso proyectado por cosecha: <b>$'+Math.round(calcIngreso(p)).toLocaleString('en-US')+'</b>.</p>';
   }).join('');
@@ -3323,7 +3343,7 @@ function mapaRepintar(){
     var col=colorDeLote(l);
     var poly=L.polygon(l.geo,{color:'#fff',weight:2,fillColor:col,fillOpacity:0.55});
     poly.addTo(MAPA);
-    poly.bindTooltip(l.nombre,{permanent:true,direction:'center',className:'lote-tooltip'});
+    poly.bindTooltip(esc(l.nombre),{permanent:true,direction:'center',className:'lote-tooltip'});
     poly.bindPopup(popupDatosLote(l.id),{maxWidth:260});
     MAPA_CAPAS[l.id]=poly;
   });
@@ -3340,7 +3360,7 @@ function popupDatosLote(id){
   if(!l)return '';
   var estadoTxt=l.estado==='preparacion'?'En preparación':l.estado==='futuro'?'Futuro / sin sembrar':'Sembrado';
   var h='<div style="font-family:Plus Jakarta Sans,sans-serif;min-width:180px">';
-  h+='<div style="font-size:13px;font-weight:800;color:var(--forest);margin-bottom:2px">'+l.nombre+'</div>';
+  h+='<div style="font-size:13px;font-weight:800;color:var(--forest);margin-bottom:2px">'+esc(l.nombre)+'</div>';
   h+='<div style="font-size:11px;color:var(--ink4);margin-bottom:8px">'+estadoTxt+(l.area?' · '+l.area+' ha':'')+'</div>';
   if(l.projId){
     var p=APP.proyectos.find(function(x){return x.id===l.projId;});
@@ -3349,7 +3369,7 @@ function popupDatosLote(id){
       var gan=calcGanancia(p);
       var s=socioUsuarioActual(p.socios);
       var tuParte=s?Math.max(0,gan*(s.pctGanancia/100)):null;
-      h+='<div style="font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:4px">🌿 '+p.nombre+'</div>';
+      h+='<div style="font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:4px">🌿 '+esc(p.nombre)+'</div>';
       h+='<table style="font-size:11px;width:100%;border-collapse:collapse">';
       h+='<tr><td style="color:var(--ink4);padding:2px 0">Plantas</td><td style="text-align:right;font-weight:700">'+plantasTot.toLocaleString('es-CR')+'</td></tr>';
       h+='<tr><td style="color:var(--ink4);padding:2px 0">Inversión</td><td style="text-align:right;font-weight:700">$'+Math.round(p.inv).toLocaleString('es-CR')+'</td></tr>';
@@ -3404,13 +3424,13 @@ function abrirModalLote(id){
   sel.innerHTML='<option value="">— sin vincular —</option>'+APP.proyectos.filter(function(p){
     return !!socioUsuarioActual(p.socios);
   }).map(function(p){
-    return '<option value="'+p.id+'"'+((l&&l.projId===p.id)?' selected':'')+'>'+p.nombre+'</option>';
+    return '<option value="'+p.id+'"'+((l&&l.projId===p.id)?' selected':'')+'>'+esc(p.nombre)+'</option>';
   }).join('');
   // Finca: las 3 propiedades arrendadas. Un lote vive en una sola.
   asegurarFincas();
   var selF=document.getElementById('ml-finca');
   selF.innerHTML='<option value="">— sin finca —</option>'+(APP.fincas||[]).map(function(f){
-    return '<option value="'+f.id+'"'+((l&&l.fincaId===f.id)?' selected':'')+'>'+f.nombre+'</option>';
+    return '<option value="'+f.id+'"'+((l&&l.fincaId===f.id)?' selected':'')+'>'+esc(f.nombre)+'</option>';
   }).join('');
   if(!l&&MAPA_FINCA_SEL!=='todas'&&MAPA_FINCA_SEL!=='sin')selF.value=MAPA_FINCA_SEL;
   // Color picker
@@ -3520,7 +3540,7 @@ function renderSelectFinca(){
   var h='<option value="todas">Todas</option>';
   (APP.fincas||[]).forEach(function(f){
     var n=mios.filter(function(l){return l.fincaId===f.id;}).length;
-    h+='<option value="'+f.id+'">'+f.nombre+' ('+n+')</option>';
+    h+='<option value="'+f.id+'">'+esc(f.nombre)+' ('+n+')</option>';
   });
   if(sinFinca)h+='<option value="sin">Sin finca ('+sinFinca+')</option>';
   sel.innerHTML=h;
@@ -3554,12 +3574,12 @@ function renderFichasFincas(){
     var costo=(parseFloat(f.areaPaga)||0)*(parseFloat(f.precioHa)||0);
     h+='<div class="card" style="margin-bottom:0"><div class="cb">';
     h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-    h+='<div style="flex:1"><div style="font-size:13px;font-weight:700">'+f.nombre+'</div>';
-    h+='<div style="font-size:11px;color:var(--ink4)">'+(f.ubicacion||'sin ubicación')+'</div></div>';
+    h+='<div style="flex:1"><div style="font-size:13px;font-weight:700">'+esc(f.nombre)+'</div>';
+    h+='<div style="font-size:11px;color:var(--ink4)">'+esc(f.ubicacion||'sin ubicación')+'</div></div>';
     h+='<button onclick="abrirModalFinca('+f.id+')" style="background:var(--fog);border:1px solid var(--border);color:var(--ink3);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✎</button>';
     h+='</div>';
     h+='<div style="font-size:11px;color:var(--ink3);line-height:1.7">';
-    h+='<div>Arrendante: '+(f.arrendante||'<span style="color:var(--ink4)">— falta —</span>')+'</div>';
+    h+='<div>Arrendante: '+(f.arrendante?esc(f.arrendante):'<span style="color:var(--ink4)">— falta —</span>')+'</div>';
     if(costo>0)h+='<div>Alquiler: ₡'+Math.round(costo).toLocaleString('es-CR')+' al año ('+f.areaPaga+' ha × ₡'+Number(f.precioHa).toLocaleString('es-CR')+')</div>';
     if(f.areaContrato&&f.areaPaga&&Number(f.areaContrato)!==Number(f.areaPaga))h+='<div style="color:var(--ink4)">El contrato declara '+f.areaContrato+' ha; se pagan '+f.areaPaga+'.</div>';
     h+='<div>Lotes dibujados: '+lotes.length+(usada>0?' · '+usada.toFixed(2)+' ha medidas':'')+'</div>';
@@ -3722,12 +3742,27 @@ function mapaCancelarEdicionForma(){
 
 // Guarda TODOS los lotes como una fila JSON en Config (mismo patrón que calibres).
 function guardarLotesEnSheet(){
+  if(!CONFIG_CARGADA){
+    toast('⚠ Guardado solo en este dispositivo: todavía no se leyó la hoja. Recargá antes de seguir.',true);
+    return;
+  }
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify({key:API_KEY,accion:'reemplazar_todo',hoja:'Config',filas:construirFilasConfig()})})
-  .then(function(r){return r.json();}).catch(function(){toast('⚠ Lote guardado local — sin conexión con Sheets',true);});
+  .then(function(r){return r.json();})
+  .then(function(res){
+    // Antes, un rechazo del servidor pasaba en silencio y parecía guardado.
+    if(res&&res.ok===false)toast('⚠ Sheets rechazó el guardado: '+(res.mensaje||'sin detalle'),true);
+  })
+  .catch(function(){toast('⚠ Lote guardado local — sin conexión con Sheets',true);});
 }
 // Config guarda varias claves (calibres + lotes); al reemplazar hay que
 // reescribir todas para no borrar las otras.
+// Bandera de seguridad: hasta que Config no se haya leido con exito al menos
+// una vez, NO se puede escribir. construirFilasConfig() reescribe TODA la hoja
+// desde lo que hay en memoria; si se ejecuta antes de cargar (Sheets caido,
+// internet lento, la pestana abierta de una), mandaria listas vacias y borraria
+// los lotes y las fincas que si estaban guardados.
+var CONFIG_CARGADA=false;
 function construirFilasConfig(){
   return [
     ['calibres_nacional',JSON.stringify(APP_CALIBRES||[])],
@@ -3750,9 +3785,9 @@ function renderListaLotes(){
     h+='<div class="card" style="margin-bottom:0;cursor:pointer" onclick="mapaIrALote('+l.id+')">';
     h+='<div class="cb" style="display:flex;align-items:center;gap:10px">';
     h+='<div style="width:14px;height:14px;border-radius:4px;background:'+col+';flex-shrink:0"></div>';
-    h+='<div style="flex:1"><div style="font-size:13px;font-weight:700">'+l.nombre+'</div>';
+    h+='<div style="flex:1"><div style="font-size:13px;font-weight:700">'+esc(l.nombre)+'</div>';
     var fc=l.fincaId?fincaPorId(l.fincaId):null;
-    h+='<div style="font-size:11px;color:var(--ink4)">'+(fc?fc.nombre+' · ':'')+estadoTxt+(l.area?' · '+l.area+' ha':'')+(p?' · '+p.nombre:'')+'</div></div>';
+    h+='<div style="font-size:11px;color:var(--ink4)">'+(fc?esc(fc.nombre)+' · ':'')+estadoTxt+(l.area?' · '+l.area+' ha':'')+(p?' · '+p.nombre:'')+'</div></div>';
     h+='<button onclick="event.stopPropagation();abrirModalLote('+l.id+')" style="background:var(--fog);border:1px solid var(--border);color:var(--ink3);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✎</button>';
     h+='</div></div>';
   });
@@ -3819,7 +3854,8 @@ function cargarDesdeSheets(callback){
       // Config: valores compartidos que no son ni proyecto ni transacción.
       // Formato de cada fila: [clave, valorJSON]. Hoy solo usamos
       // 'calibres_nacional' (precios del mercado nacional por tamaño de fruta).
-      if(Array.isArray(data.config)&&data.config.length){
+      if(Array.isArray(data.config)){
+        CONFIG_CARGADA=true;
         var filaCalibres=data.config.find(function(r){return r[0]==='calibres_nacional';});
         if(filaCalibres&&filaCalibres[1]){
           try{var c=JSON.parse(filaCalibres[1]);if(Array.isArray(c)&&c.length)APP_CALIBRES=c;}catch(e){}
