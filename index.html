@@ -665,7 +665,7 @@ nav>*{position:relative;z-index:1;}
     <div style="display:flex;gap:7px;flex-wrap:wrap">
       <button class="btn btn-primary" id="mapa-btn-dibujar" onclick="mapaModoDibujo()">✎ Dibujar lote</button>
       <button class="btn btn-ghost" id="mapa-btn-esquinas" onclick="esqAbrirPanel()">📷 Medir con fotos</button>
-      <input type="file" id="esq-input" accept="image/jpeg,image/jpg,.jpg,.jpeg" multiple style="display:none" onchange="esqCargar(this.files)">
+      <input type="file" id="esq-input" accept="image/jpeg,image/jpg,.jpg,.jpeg,.json,application/json" multiple style="display:none" onchange="esqCargar(this.files)">
       <div id="mapa-acciones-forma" style="display:none;gap:7px">
         <button class="btn btn-primary" onclick="mapaGuardarForma()">💾 Guardar forma</button>
         <button class="btn btn-ghost" onclick="mapaCancelarEdicionForma()">✕ Cancelar</button>
@@ -687,11 +687,14 @@ nav>*{position:relative;z-index:1;}
       <div class="esq-paso"><div class="esq-num">3</div><div><b>Seguí el borde</b>Siempre girando para el mismo lado.</div></div>
       <div class="esq-paso"><div class="esq-num">4</div><div><b>Traé esas fotos aquí</b>Mínimo 3. Una por cada esquina.</div></div>
     </div>
+    <div style="font-size:11.5px;color:var(--ink4);background:var(--fog);border-radius:8px;padding:9px 12px;margin-bottom:12px;line-height:1.55">
+      <b style="color:var(--ink3)">¿Finca grande o de borde curvo?</b> Ahí conviene el video: grabá dando la vuelta al borde completo, pasá el video por “Medir vuelo.bat” (carpeta <code>Vault Anyelo\Drone</code>) y arrastrá aquí el <code>.recorrido.json</code> que genera. Sigue cada curva, cosa que las esquinas sueltas no logran.
+    </div>
 
     <div class="esq-drop" id="esq-drop" onclick="document.getElementById('esq-input').click()">
       <div class="ico">📷</div>
       <h4>Arrastrá aquí las fotos de las esquinas</h4>
-      <p>o hacé clic para elegirlas</p>
+      <p>o el archivo <b>.recorrido.json</b> de un vuelo de video · o hacé clic para elegir</p>
     </div>
 
     <div id="esq-result" style="display:none">
@@ -1278,7 +1281,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.09.07.2';
+var APP_VERSION='2026.09.07.3';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -3653,6 +3656,10 @@ function txt(d, p, n) {
 //              haberlas tomado salteadas, pero solo sirve en lotes convexos.
 function esqOrdenadas() {
   var f = ESQ_FOTOS.slice();
+  // Un recorrido de video YA viene en orden: el punto 1 es el primer segundo
+  // de vuelo. Reordenarlo lo destruye (ordenaba "punto 10" antes que "punto 2"
+  // y el contorno quedaba enredado, dando 2.23 ha en vez de 2.59).
+  if (ESQ_RECORRIDO && ESQ_ORDEN === 'tiempo') return f;
   if (ESQ_ORDEN === 'tiempo') {
     f.sort(function (a, b) { return (a.fecha || '').localeCompare(b.fecha || '') || a.nombre.localeCompare(b.nombre); });
   } else {
@@ -3675,6 +3682,7 @@ function esqOtrasFotos() {
   esqLimpiarPrevia();
   esqSoltarURLs();
   ESQ_FOTOS = [];
+  ESQ_RECORRIDO = null;
   document.getElementById('esq-drop').style.display = '';
   document.getElementById('esq-pasos').style.display = '';
   document.getElementById('esq-result').style.display = 'none';
@@ -3700,6 +3708,9 @@ function esqCablearDrop() {
 
 function esqCargar(files) {
   if (!files || !files.length) return;
+  // Un .recorrido.json trae el contorno ya calculado desde el video del drone
+  var js = Array.prototype.filter.call(files, function (f) { return /\.json$/i.test(f.name); });
+  if (js.length) { esqCargarRecorrido(js[0]); return; }
   esqSoltarURLs();
   ESQ_FOTOS = [];
   var pend = files.length, sinGPS = 0;
@@ -3717,6 +3728,26 @@ function esqCargar(files) {
     fr.readAsArrayBuffer(f);
   });
 }
+// Contorno que viene de un vuelo de video, ya procesado por "Medir vuelo.bat".
+function esqCargarRecorrido(f) {
+  var fr = new FileReader();
+  fr.onload = function () {
+    var d;
+    try { d = JSON.parse(fr.result); } catch (e) { toast('⚠ Ese archivo no se pudo leer', true); return; }
+    if (!d || !Array.isArray(d.puntos) || d.puntos.length < 3) { toast('⚠ El archivo no trae un recorrido válido', true); return; }
+    esqSoltarURLs();
+    ESQ_RECORRIDO = d;
+    ESQ_FOTOS = d.puntos.map(function (p, i) { return { nombre: 'punto ' + (i + 1), lat: p[0], lon: p[1], fecha: '', file: null }; });
+    ESQ_ORDEN = 'tiempo';
+    document.getElementById('esq-drop').style.display = 'none';
+    document.getElementById('esq-pasos').style.display = 'none';
+    document.getElementById('esq-result').style.display = '';
+    esqPintarPrevia();
+  };
+  fr.readAsText(f);
+}
+var ESQ_RECORRIDO = null;
+
 function esqListo(sinGPS) {
   if (ESQ_FOTOS.length < 3) {
     toast('⚠ Hacen falta al menos 3 fotos con coordenadas. Sirvieron ' + ESQ_FOTOS.length +
@@ -3751,18 +3782,29 @@ function esqPintarPrevia() {
   esqSoltarURLs();
   var t = '';
   orden.forEach(function (p, i) {
+    if (!p.file) return;
     var u = URL.createObjectURL(p.file); ESQ_URLS.push(u);
     t += '<div class="esq-tira"><img src="' + u + '" alt=""><b>' + (i + 1) + '</b>' +
          '<span>' + esc(p.nombre.replace(/\.[^.]+$/, '')) + '</span></div>';
   });
   document.getElementById('esq-tiras').innerHTML = t;
 
+  var esVideo = !!ESQ_RECORRIDO;
+  var nota;
+  if (esVideo) {
+    var c = ESQ_RECORRIDO.cierre_m;
+    nota = 'Contorno tomado del video (' + ESQ_RECORRIDO.puntos_originales + ' puntos, simplificados a ' + ESQ_FOTOS.length + ').';
+    nota += (c > 40)
+      ? ' <b style="color:var(--red)">La vuelta no cerró: quedaron ' + Math.round(c) + ' m entre el inicio y el final, así que el área puede estar corrida.</b>'
+      : ' Volviste a ' + Math.round(c) + ' m del punto de partida, o sea el GPS se portó bien.';
+  } else {
+    nota = 'Uniendo las esquinas ' + (ESQ_ORDEN === 'tiempo' ? 'en el orden en que tomaste las fotos' : 'acomodadas en círculo') +
+           '. Mirá el contorno naranja en el mapa: si se cruza consigo mismo, tocá “Cambiar el orden”.';
+  }
   document.getElementById('esq-resumen').innerHTML =
     '<b style="font-size:15px;color:var(--forest)">' + ha.toFixed(2) + ' ha</b> · ' +
-    ESQ_FOTOS.length + ' esquinas · perímetro ' + Math.round(per) + ' m' +
-    '<div style="font-size:11.5px;color:var(--ink4);margin-top:3px">Uniendo las esquinas ' +
-    (ESQ_ORDEN === 'tiempo' ? 'en el orden en que tomaste las fotos' : 'acomodadas en círculo') +
-    '. Mirá el contorno naranja en el mapa: si se cruza consigo mismo, tocá “Cambiar el orden”.</div>';
+    ESQ_FOTOS.length + (esVideo ? ' puntos' : ' esquinas') + ' · perímetro ' + Math.round(per) + ' m' +
+    '<div style="font-size:11.5px;color:var(--ink4);margin-top:3px">' + nota + '</div>';
 
   if (!MAPA) return;
   ESQ_CAPA = L.polygon(geo, { color: '#e8590c', weight: 3, fillColor: '#e8590c', fillOpacity: 0.25, dashArray: '6 4' }).addTo(MAPA);
