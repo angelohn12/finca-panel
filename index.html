@@ -79,6 +79,29 @@ nav>*{position:relative;z-index:1;}
 .nav-tab:hover{color:rgba(255,255,255,.8);background:rgba(255,255,255,.07);}
 .nav-tab.active{color:var(--lime2);background:rgba(118,196,66,.12);}
 .nav-spacer{flex:1;}
+.subnav{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:10px;flex-wrap:wrap;}
+.subtab{background:none;border:1px solid transparent;color:var(--ink4);padding:7px 15px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer;border-radius:8px;transition:all .15s;white-space:nowrap;}
+.subtab:hover{color:var(--ink2);background:var(--fog);}
+.subtab.active{color:var(--forest);background:var(--mist);border-color:var(--border);}
+.esq-panel{border:1px solid var(--border);border-radius:12px;background:var(--card);padding:16px;margin-bottom:14px;}
+.esq-pasos{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+.esq-paso{flex:1;min-width:170px;display:flex;gap:9px;align-items:flex-start;}
+.esq-num{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--mist);color:var(--forest);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+.esq-paso div{font-size:12px;color:var(--ink3);line-height:1.5;}
+.esq-paso b{color:var(--ink);display:block;font-size:12.5px;}
+.esq-drop{border:2px dashed var(--border);border-radius:var(--radius);background:var(--fog);padding:26px 18px;text-align:center;cursor:pointer;transition:all .15s;}
+.esq-drop:hover{border-color:var(--leaf2);background:var(--mist);}
+.esq-drop.drag{border-color:var(--leaf2);background:var(--mist);}
+.esq-drop .ico{font-size:26px;margin-bottom:6px;}
+.esq-drop h4{font-size:13.5px;font-weight:700;color:var(--ink);margin:0 0 3px;}
+.esq-drop p{font-size:12px;color:var(--ink4);margin:0;}
+.esq-tiras{display:flex;gap:8px;overflow-x:auto;padding:4px 0 8px;}
+.esq-tira{flex-shrink:0;width:78px;text-align:center;}
+.esq-tira img{width:78px;height:58px;object-fit:cover;border-radius:7px;border:2px solid var(--border);display:block;}
+.esq-tira span{font-size:10px;color:var(--ink4);display:block;margin-top:3px;}
+.esq-tira b{position:relative;top:-46px;left:-30px;background:#e8590c;color:#fff;border-radius:50%;width:19px;height:19px;font-size:10px;line-height:19px;display:inline-block;border:2px solid #fff;}
+.subpage{display:none;}
+.subpage.active{display:block;}
 .nav-spacer-mobile-only{display:none;}
 .nav-menu{display:flex;align-items:center;gap:2px;flex:1;min-width:0;}
 .nav-burger{display:none;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:18px;width:36px;height:36px;border-radius:8px;cursor:pointer;flex-shrink:0;}
@@ -429,8 +452,7 @@ nav>*{position:relative;z-index:1;}
     <button class="nav-tab" id="tab-mivista" onclick="pg('mivista',this)">👤 Mi Vista</button>
     <button class="nav-tab" id="tab-movimientos" onclick="pg('movimientos',this)">💳 Movimientos</button>
     <button class="nav-tab" id="tab-finanzas" onclick="pg('finanzas',this)">📊 Finanzas</button>
-    <button class="nav-tab" id="tab-mapa" onclick="pg('mapa',this)">🗺️ Mapa</button>
-    <button class="nav-tab" id="tab-bloques" onclick="pg('bloques',this)">🧩 Bloques</button>
+    <button class="nav-tab" id="tab-terreno" onclick="pg('terreno',this)">🗺️ Terreno</button>
     <button class="nav-tab" id="tab-documentos" onclick="pg('documentos',this)">📄 Documentos</button>
     <button class="nav-tab" id="tab-misfinanzas" onclick="pg('misfinanzas',this)">💸 Mis Finanzas</button>
     <div class="nav-spacer"></div>
@@ -628,25 +650,61 @@ nav>*{position:relative;z-index:1;}
   </div>
 </div>
 
-<!-- ══ MAPA DE LOTES ══ -->
-<div class="page" id="p-mapa">
+<!-- ══ TERRENO — mapa de lotes + bloques de siembra ══ -->
+<!-- Antes eran dos pestañas separadas. Son lo mismo: el terreno. El mapa dice
+     DÓNDE está y cuánto mide; los bloques dicen cómo está dividido por dentro. -->
+<div class="page" id="p-terreno">
+  <div class="subnav">
+    <button class="subtab active" id="stab-mapa" onclick="terrenoVista('mapa')">🗺️ Mapa de lotes</button>
+    <button class="subtab" id="stab-bloques" onclick="terrenoVista('bloques')">🧩 Bloques de siembra</button>
+  </div>
+
+<div class="subpage active" id="sp-mapa">
   <div class="ph">
     <div><div class="pt">Mapa de la finca</div><div class="ps">Dibujá tus lotes sobre el mapa satelital · tocá un lote para ver sus datos</div></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap">
       <button class="btn btn-primary" id="mapa-btn-dibujar" onclick="mapaModoDibujo()">✎ Dibujar lote</button>
-      <button class="btn btn-ghost" id="mapa-btn-esquinas" onclick="esqElegirFotos()">📷 Importar esquinas</button>
+      <button class="btn btn-ghost" id="mapa-btn-esquinas" onclick="esqAbrirPanel()">📷 Medir con fotos</button>
       <input type="file" id="esq-input" accept="image/jpeg,image/jpg,.jpg,.jpeg" multiple style="display:none" onchange="esqCargar(this.files)">
-      <div id="esq-barra" style="display:none;gap:7px;align-items:center;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="esqGuardar()">✓ Usar este lote</button>
-        <button class="btn btn-ghost" onclick="esqCambiarOrden()">⇄ Cambiar orden</button>
-        <button class="btn btn-ghost" onclick="esqCancelar()">✕ Cancelar</button>
-      </div>
       <div id="mapa-acciones-forma" style="display:none;gap:7px">
         <button class="btn btn-primary" onclick="mapaGuardarForma()">💾 Guardar forma</button>
         <button class="btn btn-ghost" onclick="mapaCancelarEdicionForma()">✕ Cancelar</button>
       </div>
     </div>
   </div>
+  <div class="esq-panel" id="esq-panel" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px">
+      <div>
+        <div style="font-size:14px;font-weight:800;color:var(--ink)">Medir un lote con fotos del drone</div>
+        <div style="font-size:12px;color:var(--ink4);margin-top:2px">Las fotos se leen aquí en tu navegador — no se suben a ningún lado.</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="esqCancelar()">✕ Cerrar</button>
+    </div>
+
+    <div class="esq-pasos" id="esq-pasos">
+      <div class="esq-paso"><div class="esq-num">1</div><div><b>Volá a una esquina</b>Quedate quieto 3 segundos antes de disparar.</div></div>
+      <div class="esq-paso"><div class="esq-num">2</div><div><b>Tomá una foto</b>No importa hacia dónde mire la cámara.</div></div>
+      <div class="esq-paso"><div class="esq-num">3</div><div><b>Seguí el borde</b>Siempre girando para el mismo lado.</div></div>
+      <div class="esq-paso"><div class="esq-num">4</div><div><b>Traé esas fotos aquí</b>Mínimo 3. Una por cada esquina.</div></div>
+    </div>
+
+    <div class="esq-drop" id="esq-drop" onclick="document.getElementById('esq-input').click()">
+      <div class="ico">📷</div>
+      <h4>Arrastrá aquí las fotos de las esquinas</h4>
+      <p>o hacé clic para elegirlas</p>
+    </div>
+
+    <div id="esq-result" style="display:none">
+      <div class="esq-tiras" id="esq-tiras"></div>
+      <div id="esq-resumen" style="font-size:13px;color:var(--ink2);margin:4px 0 12px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="esqGuardar()">✓ Usar este lote</button>
+        <button class="btn btn-ghost" onclick="esqCambiarOrden()">⇄ Cambiar el orden</button>
+        <button class="btn btn-ghost" onclick="esqOtrasFotos()">📷 Otras fotos</button>
+      </div>
+    </div>
+  </div>
+
   <div class="card" style="overflow:hidden">
     <div class="ch">
       <div class="ct">Lotes de la finca</div>
@@ -677,7 +735,6 @@ nav>*{position:relative;z-index:1;}
       <div id="mapa-cargando" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink4);font-size:13px;background:var(--fog);z-index:2">🗺️ Cargando mapa…</div>
     </div>
     <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div style="font-size:11px;color:var(--ink3);flex:1;min-width:240px" id="esq-resumen"></div>
       <div style="font-size:11px;color:var(--ink4)" id="mapa-ayuda">Navegá hasta tu finca (arrastrá y usá zoom), luego "✎ Dibujar lote" y tocá el mapa para marcar las esquinas.</div>
       <div style="font-size:11px;color:var(--ink3)" id="mapa-contador"></div>
     </div>
@@ -686,8 +743,7 @@ nav>*{position:relative;z-index:1;}
   <div id="mapa-fincas-fichas"></div>
 </div>
 
-<!-- ══ BLOQUES DE SIEMBRA ══ -->
-<div class="page" id="p-bloques">
+<div class="subpage" id="sp-bloques">
   <div class="ph">
     <div><div class="pt">Bloques de siembra</div><div class="ps">Delimitá y numerá los bloques sobre una foto aérea de dron · plantas y densidad por bloque</div></div>
     <div id="bq-topbar-actions" style="display:none;gap:7px;flex-wrap:wrap">
@@ -797,6 +853,7 @@ nav>*{position:relative;z-index:1;}
       </div>
     </div>
   </div>
+</div>
 </div>
 
 <!-- ══ MODAL HOJA DE IMPRESIÓN (bloques) ══ -->
@@ -1221,7 +1278,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.09.07.1';
+var APP_VERSION='2026.09.07.2';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1330,10 +1387,12 @@ function aplicarRol(){
   mostrarBienvenidaSiCorresponde();
   // Respeta la sección de la URL si es válida (deep link / recarga de página);
   // si no hay hash o Jonathan no tiene acceso a esa pestaña, va a Portafolio.
-  var PESTANAS_VALIDAS=['portafolio','mivista','movimientos','finanzas','mapa','documentos','guia','misfinanzas'];
+  // 'mapa' y 'bloques' siguen en la lista por los enlaces guardados de antes:
+  // pg() los redirige a 'terreno' en la sub-vista correcta.
+  var PESTANAS_VALIDAS=['portafolio','mivista','movimientos','finanzas','terreno','mapa','bloques','documentos','guia','misfinanzas'];
   var idInicial=window.location.hash.slice(1);
   if(!PESTANAS_VALIDAS.includes(idInicial)||(soloEmpresa&&idInicial==='misfinanzas'))idInicial='portafolio';
-  pg(idInicial,document.getElementById('tab-'+idInicial));
+  pg(idInicial);
 }
 
 // Botón "atrás"/"adelante" del navegador entre secciones (deep linking).
@@ -1527,7 +1586,30 @@ function toggleNavMenu(){
   document.getElementById('nav-menu').classList.toggle('open');
 }
 
+// ── Cambio entre "Mapa de lotes" y "Bloques de siembra" ──
+// Viven en la misma pestaña porque son la misma cosa vista de dos maneras.
+var TERRENO_VISTA='mapa';
+function terrenoVista(v){
+  TERRENO_VISTA=v;
+  ['mapa','bloques'].forEach(function(x){
+    var sp=document.getElementById('sp-'+x), st=document.getElementById('stab-'+x);
+    if(sp)sp.classList.toggle('active',x===v);
+    if(st)st.classList.toggle('active',x===v);
+  });
+  if(v==='mapa'){
+    initMapa();
+    // Leaflet mide el contenedor al crearse; si estaba escondido queda en cero
+    // y el mapa sale gris. Hay que avisarle que ya tiene tamaño.
+    if(typeof MAPA!=='undefined'&&MAPA)setTimeout(function(){MAPA.invalidateSize();},60);
+  } else {
+    initBloques();
+  }
+}
+
 function pg(id,btn,skipHash){
+  // Compatibilidad: los enlaces guardados a #mapa o #bloques ahora abren
+  // Terreno en la sub-vista que corresponde.
+  if(id==='mapa'||id==='bloques'){TERRENO_VISTA=id;id='terreno';}
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active');});
   document.getElementById('p-'+id).classList.add('active');
@@ -1545,8 +1627,7 @@ function pg(id,btn,skipHash){
     if(id==='movimientos'){poblarSelectProyectos();renderTx();renderKPIs();}
     if(id==='finanzas'){poblarSelectProyectos();renderFin();}
     if(id==='portafolio'){renderPortafolio();}
-    if(id==='mapa'){initMapa();}
-    if(id==='bloques'){initBloques();}
+    if(id==='terreno'){terrenoVista(TERRENO_VISTA);}
     if(id==='documentos'){renderDocProyectos();}
   }
   // Todas las pestañas refrescan primero desde Sheets (fuente de verdad) para
@@ -3583,14 +3664,43 @@ function esqOrdenadas() {
 }
 function esqGeo() { return esqOrdenadas().map(function (p) { return [p.lat, p.lon]; }); }
 
-// ── Botón: elegir fotos ──
-function esqElegirFotos() {
-  var inp = document.getElementById('esq-input');
-  inp.value = '';
-  inp.click();
+// ── Panel guiado ──
+function esqAbrirPanel() {
+  document.getElementById('esq-panel').style.display = '';
+  esqOtrasFotos();
+  esqCablearDrop();
+  document.getElementById('esq-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
+function esqOtrasFotos() {
+  esqLimpiarPrevia();
+  esqSoltarURLs();
+  ESQ_FOTOS = [];
+  document.getElementById('esq-drop').style.display = '';
+  document.getElementById('esq-pasos').style.display = '';
+  document.getElementById('esq-result').style.display = 'none';
+  document.getElementById('esq-input').value = '';
+}
+// Arrastrar y soltar fotos sobre la zona
+var ESQ_CABLEADO = false;
+function esqCablearDrop() {
+  if (ESQ_CABLEADO) return;
+  ESQ_CABLEADO = true;
+  var dz = document.getElementById('esq-drop');
+  ['dragover', 'dragenter'].forEach(function (e) {
+    dz.addEventListener(e, function (ev) { ev.preventDefault(); dz.classList.add('drag'); });
+  });
+  ['dragleave', 'dragend'].forEach(function (e) {
+    dz.addEventListener(e, function () { dz.classList.remove('drag'); });
+  });
+  dz.addEventListener('drop', function (ev) {
+    ev.preventDefault(); dz.classList.remove('drag');
+    if (ev.dataTransfer.files && ev.dataTransfer.files.length) esqCargar(ev.dataTransfer.files);
+  });
+}
+
 function esqCargar(files) {
   if (!files || !files.length) return;
+  esqSoltarURLs();
   ESQ_FOTOS = [];
   var pend = files.length, sinGPS = 0;
   toast('⏳ Leyendo ' + pend + ' foto(s)…');
@@ -3599,7 +3709,7 @@ function esqCargar(files) {
     fr.onload = function () {
       var r = null;
       try { r = exifDeJPG(fr.result); } catch (e) { r = null; }
-      if (r && Math.abs(r.lat) > 0.001) ESQ_FOTOS.push({ nombre: f.name, lat: r.lat, lon: r.lon, fecha: r.fecha });
+      if (r && Math.abs(r.lat) > 0.001) ESQ_FOTOS.push({ nombre: f.name, lat: r.lat, lon: r.lon, fecha: r.fecha, file: f });
       else sinGPS++;
       if (--pend === 0) esqListo(sinGPS);
     };
@@ -3609,27 +3719,54 @@ function esqCargar(files) {
 }
 function esqListo(sinGPS) {
   if (ESQ_FOTOS.length < 3) {
-    toast('⚠ Necesito al menos 3 fotos con GPS. Válidas: ' + ESQ_FOTOS.length + (sinGPS ? ' · sin coordenadas: ' + sinGPS : ''), true);
+    toast('⚠ Hacen falta al menos 3 fotos con coordenadas. Sirvieron ' + ESQ_FOTOS.length +
+          (sinGPS ? ' y ' + sinGPS + ' no traían GPS.' : '.'), true);
     return;
   }
   ESQ_ORDEN = 'tiempo';
+  document.getElementById('esq-drop').style.display = 'none';
+  document.getElementById('esq-pasos').style.display = 'none';
+  document.getElementById('esq-result').style.display = '';
   esqPintarPrevia();
-  if (sinGPS) toast('⚠ ' + sinGPS + ' foto(s) sin coordenadas, las salté');
+  if (sinGPS) toast('⚠ Salté ' + sinGPS + ' foto(s) sin coordenadas');
 }
 
 // ── Vista previa sobre el mapa, antes de guardar nada ──
-var ESQ_CAPA = null, ESQ_MARCAS = [];
+var ESQ_CAPA = null, ESQ_MARCAS = [], ESQ_URLS = [];
+function esqSoltarURLs() {
+  ESQ_URLS.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
+  ESQ_URLS = [];
+}
 function esqLimpiarPrevia() {
   if (ESQ_CAPA && MAPA) { MAPA.removeLayer(ESQ_CAPA); ESQ_CAPA = null; }
   ESQ_MARCAS.forEach(function (m) { if (MAPA) MAPA.removeLayer(m); });
   ESQ_MARCAS = [];
 }
 function esqPintarPrevia() {
-  if (!MAPA) return;
   esqLimpiarPrevia();
-  var geo = esqGeo();
+  var orden = esqOrdenadas(), geo = esqGeo();
+  var ha = areaHaDeGeo(geo), per = perimetroMDeGeo(geo);
+
+  // Tiras con las fotos en el orden en que se van a unir
+  esqSoltarURLs();
+  var t = '';
+  orden.forEach(function (p, i) {
+    var u = URL.createObjectURL(p.file); ESQ_URLS.push(u);
+    t += '<div class="esq-tira"><img src="' + u + '" alt=""><b>' + (i + 1) + '</b>' +
+         '<span>' + esc(p.nombre.replace(/\.[^.]+$/, '')) + '</span></div>';
+  });
+  document.getElementById('esq-tiras').innerHTML = t;
+
+  document.getElementById('esq-resumen').innerHTML =
+    '<b style="font-size:15px;color:var(--forest)">' + ha.toFixed(2) + ' ha</b> · ' +
+    ESQ_FOTOS.length + ' esquinas · perímetro ' + Math.round(per) + ' m' +
+    '<div style="font-size:11.5px;color:var(--ink4);margin-top:3px">Uniendo las esquinas ' +
+    (ESQ_ORDEN === 'tiempo' ? 'en el orden en que tomaste las fotos' : 'acomodadas en círculo') +
+    '. Mirá el contorno naranja en el mapa: si se cruza consigo mismo, tocá “Cambiar el orden”.</div>';
+
+  if (!MAPA) return;
   ESQ_CAPA = L.polygon(geo, { color: '#e8590c', weight: 3, fillColor: '#e8590c', fillOpacity: 0.25, dashArray: '6 4' }).addTo(MAPA);
-  esqOrdenadas().forEach(function (p, i) {
+  orden.forEach(function (p, i) {
     var m = L.marker([p.lat, p.lon], {
       icon: L.divIcon({ className: '', iconSize: [22, 22], iconAnchor: [11, 11],
         html: '<div style="background:#e8590c;color:#fff;border:2px solid #fff;border-radius:50%;width:22px;height:22px;line-height:19px;text-align:center;font-size:11px;font-weight:700">' + (i + 1) + '</div>' })
@@ -3638,13 +3775,6 @@ function esqPintarPrevia() {
     ESQ_MARCAS.push(m);
   });
   MAPA.fitBounds(ESQ_CAPA.getBounds().pad(0.35));
-  var ha = areaHaDeGeo(geo), per = perimetroMDeGeo(geo);
-  document.getElementById('esq-resumen').innerHTML =
-    '<b>' + ESQ_FOTOS.length + ' esquinas</b> · <b>' + ha.toFixed(2) + ' ha</b> · perímetro ' + Math.round(per) + ' m' +
-    '<div style="font-size:11px;color:var(--ink4);margin-top:3px">Orden: ' +
-    (ESQ_ORDEN === 'tiempo' ? 'como las tomaste' : 'acomodadas en círculo') + '. Mirá los números en el mapa: si el contorno se cruza, cambiá el orden.</div>';
-  document.getElementById('esq-barra').style.display = 'flex';
-  document.getElementById('mapa-btn-dibujar').style.display = 'none';
 }
 function esqCambiarOrden() {
   ESQ_ORDEN = (ESQ_ORDEN === 'tiempo') ? 'giro' : 'tiempo';
@@ -3652,17 +3782,17 @@ function esqCambiarOrden() {
 }
 function esqCancelar() {
   esqLimpiarPrevia();
+  esqSoltarURLs();
   ESQ_FOTOS = [];
-  document.getElementById('esq-barra').style.display = 'none';
-  document.getElementById('mapa-btn-dibujar').style.display = '';
+  document.getElementById('esq-panel').style.display = 'none';
 }
 function esqGuardar() {
   if (ESQ_FOTOS.length < 3) return;
   LOTE_NUEVA_GEO = esqGeo();
   esqLimpiarPrevia();
-  document.getElementById('esq-barra').style.display = 'none';
-  document.getElementById('mapa-btn-dibujar').style.display = '';
+  esqSoltarURLs();
   ESQ_FOTOS = [];
+  document.getElementById('esq-panel').style.display = 'none';
   abrirModalLote(null);
 }
 
@@ -4388,7 +4518,7 @@ function initBloques(){
   canvas.addEventListener('dblclick',function(e){if(state.editIndex!==-1)return;e.preventDefault();finishPart();});
   document.addEventListener('keydown',function(e){
     if(!state.img)return;
-    if(!document.getElementById('p-bloques').classList.contains('active'))return; // solo cuando esta pestaña está activa
+    if(!document.getElementById('sp-bloques').classList.contains('active'))return; // solo cuando esta pestaña está activa
     var tag=(e.target&&e.target.tagName)||'';
     if(tag==='INPUT'||tag==='TEXTAREA')return;
     if(state.editIndex!==-1){if(e.key==='Escape')cancelEdit();else if(e.key==='Enter')finishEdit();return;}
