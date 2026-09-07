@@ -634,6 +634,13 @@ nav>*{position:relative;z-index:1;}
     <div><div class="pt">Mapa de la finca</div><div class="ps">Dibujá tus lotes sobre el mapa satelital · tocá un lote para ver sus datos</div></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap">
       <button class="btn btn-primary" id="mapa-btn-dibujar" onclick="mapaModoDibujo()">✎ Dibujar lote</button>
+      <button class="btn btn-ghost" id="mapa-btn-esquinas" onclick="esqElegirFotos()">📷 Importar esquinas</button>
+      <input type="file" id="esq-input" accept="image/jpeg,image/jpg,.jpg,.jpeg" multiple style="display:none" onchange="esqCargar(this.files)">
+      <div id="esq-barra" style="display:none;gap:7px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="esqGuardar()">✓ Usar este lote</button>
+        <button class="btn btn-ghost" onclick="esqCambiarOrden()">⇄ Cambiar orden</button>
+        <button class="btn btn-ghost" onclick="esqCancelar()">✕ Cancelar</button>
+      </div>
       <div id="mapa-acciones-forma" style="display:none;gap:7px">
         <button class="btn btn-primary" onclick="mapaGuardarForma()">💾 Guardar forma</button>
         <button class="btn btn-ghost" onclick="mapaCancelarEdicionForma()">✕ Cancelar</button>
@@ -670,6 +677,7 @@ nav>*{position:relative;z-index:1;}
       <div id="mapa-cargando" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink4);font-size:13px;background:var(--fog);z-index:2">🗺️ Cargando mapa…</div>
     </div>
     <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-size:11px;color:var(--ink3);flex:1;min-width:240px" id="esq-resumen"></div>
       <div style="font-size:11px;color:var(--ink4)" id="mapa-ayuda">Navegá hasta tu finca (arrastrá y usá zoom), luego "✎ Dibujar lote" y tocá el mapa para marcar las esquinas.</div>
       <div style="font-size:11px;color:var(--ink3)" id="mapa-contador"></div>
     </div>
@@ -1213,7 +1221,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.09.06.3';
+var APP_VERSION='2026.09.07.1';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -3487,6 +3495,175 @@ function pintarAreaCalculada(geo){
   el.innerHTML='📐 El dibujo mide <b>'+ha.toFixed(2)+' ha</b> · perímetro '+Math.round(perimetroMDeGeo(geo))+' m &nbsp;<span id="ml-area-usar" style="text-decoration:underline;cursor:pointer">usar este valor</span>';
   var btn=document.getElementById('ml-area-usar');
   if(btn)btn.onclick=function(){document.getElementById('ml-area').value=ha.toFixed(2);};
+}
+
+// ══ IMPORTAR ESQUINAS DESDE FOTOS DEL DRONE ═══════════════════════════════
+// Cada foto del drone guarda dónde se tomó, con resolución de milímetros
+// (medido: dos fotos seguidas con el drone quieto quedan a 21 cm una de otra).
+// El subtítulo de los videos solo guarda 11 m, así que para medir un lote
+// sirven las FOTOS, no el video.
+//
+// Flujo: Anyelo vuela a cada esquina, se queda quieto, toma una foto. Después
+// elige esas fotos aquí y el lote se dibuja solo.
+
+var ESQ_FOTOS = [];          // {nombre, lat, lon, fecha}
+var ESQ_ORDEN = 'tiempo';    // 'tiempo' | 'giro'
+
+// ── Lector de EXIF: saca coordenadas y fecha de un JPG, sin librerías ──
+function exifDeJPG(buf) {
+  var d = new DataView(buf);
+  if (d.getUint16(0) !== 0xFFD8) return null;          // no es JPG
+  var off = 2, largo = d.byteLength;
+  while (off < largo - 4) {
+    if (d.getUint16(off) !== 0xFFE1) {                  // buscar el bloque APP1
+      if ((d.getUint8(off) !== 0xFF)) return null;
+      off += 2 + d.getUint16(off + 2);
+      continue;
+    }
+    var tiff = off + 10;                                // saltar "Exif\0\0"
+    if (d.getUint32(off + 4) !== 0x45786966) return null;
+    var le = d.getUint16(tiff) === 0x4949;              // orden de bytes
+    var u16 = function (p) { return d.getUint16(p, le); };
+    var u32 = function (p) { return d.getUint32(p, le); };
+    var rac = function (p) { return u32(p) / (u32(p + 4) || 1); };
+
+    var ifd0 = tiff + u32(tiff + 4), gpsPtr = 0, exifPtr = 0, fecha = '';
+    var n = u16(ifd0);
+    for (var i = 0; i < n; i++) {
+      var e = ifd0 + 2 + i * 12, tag = u16(e);
+      if (tag === 0x8825) gpsPtr = tiff + u32(e + 8);
+      if (tag === 0x8769) exifPtr = tiff + u32(e + 8);
+      if (tag === 0x0132) fecha = txt(d, tiff + u32(e + 8), u32(e + 4));
+    }
+    if (exifPtr) {                                      // fecha real de captura
+      var m = u16(exifPtr);
+      for (var j = 0; j < m; j++) {
+        var f = exifPtr + 2 + j * 12;
+        if (u16(f) === 0x9003) fecha = txt(d, tiff + u32(f + 8), u32(f + 4));
+      }
+    }
+    if (!gpsPtr) return null;
+
+    var lat = null, lon = null, latR = 'N', lonR = 'E';
+    var g = u16(gpsPtr);
+    for (var k = 0; k < g; k++) {
+      var t = gpsPtr + 2 + k * 12, id = u16(t), val = tiff + u32(t + 8);
+      if (id === 1) latR = String.fromCharCode(d.getUint8(t + 8));
+      if (id === 3) lonR = String.fromCharCode(d.getUint8(t + 8));
+      if (id === 2) lat = rac(val) + rac(val + 8) / 60 + rac(val + 16) / 3600;
+      if (id === 4) lon = rac(val) + rac(val + 8) / 60 + rac(val + 16) / 3600;
+    }
+    if (lat === null || lon === null) return null;
+    if (latR === 'S') lat = -lat;
+    if (lonR === 'W') lon = -lon;
+    return { lat: lat, lon: lon, fecha: fecha };
+  }
+  return null;
+}
+function txt(d, p, n) {
+  var s = '';
+  for (var i = 0; i < n - 1; i++) { var c = d.getUint8(p + i); if (c) s += String.fromCharCode(c); }
+  return s;
+}
+
+// ── Ordenar las esquinas ──
+// Por tiempo = el orden en que las tomó (correcto si dio la vuelta seguido).
+// Por giro   = las acomoda en círculo alrededor del centro; salva el caso de
+//              haberlas tomado salteadas, pero solo sirve en lotes convexos.
+function esqOrdenadas() {
+  var f = ESQ_FOTOS.slice();
+  if (ESQ_ORDEN === 'tiempo') {
+    f.sort(function (a, b) { return (a.fecha || '').localeCompare(b.fecha || '') || a.nombre.localeCompare(b.nombre); });
+  } else {
+    var cy = f.reduce(function (s, p) { return s + p.lat; }, 0) / f.length;
+    var cx = f.reduce(function (s, p) { return s + p.lon; }, 0) / f.length;
+    f.sort(function (a, b) { return Math.atan2(a.lat - cy, a.lon - cx) - Math.atan2(b.lat - cy, b.lon - cx); });
+  }
+  return f;
+}
+function esqGeo() { return esqOrdenadas().map(function (p) { return [p.lat, p.lon]; }); }
+
+// ── Botón: elegir fotos ──
+function esqElegirFotos() {
+  var inp = document.getElementById('esq-input');
+  inp.value = '';
+  inp.click();
+}
+function esqCargar(files) {
+  if (!files || !files.length) return;
+  ESQ_FOTOS = [];
+  var pend = files.length, sinGPS = 0;
+  toast('⏳ Leyendo ' + pend + ' foto(s)…');
+  Array.prototype.forEach.call(files, function (f) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var r = null;
+      try { r = exifDeJPG(fr.result); } catch (e) { r = null; }
+      if (r && Math.abs(r.lat) > 0.001) ESQ_FOTOS.push({ nombre: f.name, lat: r.lat, lon: r.lon, fecha: r.fecha });
+      else sinGPS++;
+      if (--pend === 0) esqListo(sinGPS);
+    };
+    fr.onerror = function () { sinGPS++; if (--pend === 0) esqListo(sinGPS); };
+    fr.readAsArrayBuffer(f);
+  });
+}
+function esqListo(sinGPS) {
+  if (ESQ_FOTOS.length < 3) {
+    toast('⚠ Necesito al menos 3 fotos con GPS. Válidas: ' + ESQ_FOTOS.length + (sinGPS ? ' · sin coordenadas: ' + sinGPS : ''), true);
+    return;
+  }
+  ESQ_ORDEN = 'tiempo';
+  esqPintarPrevia();
+  if (sinGPS) toast('⚠ ' + sinGPS + ' foto(s) sin coordenadas, las salté');
+}
+
+// ── Vista previa sobre el mapa, antes de guardar nada ──
+var ESQ_CAPA = null, ESQ_MARCAS = [];
+function esqLimpiarPrevia() {
+  if (ESQ_CAPA && MAPA) { MAPA.removeLayer(ESQ_CAPA); ESQ_CAPA = null; }
+  ESQ_MARCAS.forEach(function (m) { if (MAPA) MAPA.removeLayer(m); });
+  ESQ_MARCAS = [];
+}
+function esqPintarPrevia() {
+  if (!MAPA) return;
+  esqLimpiarPrevia();
+  var geo = esqGeo();
+  ESQ_CAPA = L.polygon(geo, { color: '#e8590c', weight: 3, fillColor: '#e8590c', fillOpacity: 0.25, dashArray: '6 4' }).addTo(MAPA);
+  esqOrdenadas().forEach(function (p, i) {
+    var m = L.marker([p.lat, p.lon], {
+      icon: L.divIcon({ className: '', iconSize: [22, 22], iconAnchor: [11, 11],
+        html: '<div style="background:#e8590c;color:#fff;border:2px solid #fff;border-radius:50%;width:22px;height:22px;line-height:19px;text-align:center;font-size:11px;font-weight:700">' + (i + 1) + '</div>' })
+    }).addTo(MAPA);
+    m.bindTooltip(esc(p.nombre), { direction: 'top' });
+    ESQ_MARCAS.push(m);
+  });
+  MAPA.fitBounds(ESQ_CAPA.getBounds().pad(0.35));
+  var ha = areaHaDeGeo(geo), per = perimetroMDeGeo(geo);
+  document.getElementById('esq-resumen').innerHTML =
+    '<b>' + ESQ_FOTOS.length + ' esquinas</b> · <b>' + ha.toFixed(2) + ' ha</b> · perímetro ' + Math.round(per) + ' m' +
+    '<div style="font-size:11px;color:var(--ink4);margin-top:3px">Orden: ' +
+    (ESQ_ORDEN === 'tiempo' ? 'como las tomaste' : 'acomodadas en círculo') + '. Mirá los números en el mapa: si el contorno se cruza, cambiá el orden.</div>';
+  document.getElementById('esq-barra').style.display = 'flex';
+  document.getElementById('mapa-btn-dibujar').style.display = 'none';
+}
+function esqCambiarOrden() {
+  ESQ_ORDEN = (ESQ_ORDEN === 'tiempo') ? 'giro' : 'tiempo';
+  esqPintarPrevia();
+}
+function esqCancelar() {
+  esqLimpiarPrevia();
+  ESQ_FOTOS = [];
+  document.getElementById('esq-barra').style.display = 'none';
+  document.getElementById('mapa-btn-dibujar').style.display = '';
+}
+function esqGuardar() {
+  if (ESQ_FOTOS.length < 3) return;
+  LOTE_NUEVA_GEO = esqGeo();
+  esqLimpiarPrevia();
+  document.getElementById('esq-barra').style.display = 'none';
+  document.getElementById('mapa-btn-dibujar').style.display = '';
+  ESQ_FOTOS = [];
+  abrirModalLote(null);
 }
 
 // ══ FINCAS ════════════════════════════════════════════════════════════════
