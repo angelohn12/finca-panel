@@ -645,6 +645,10 @@ nav>*{position:relative;z-index:1;}
       <div class="ct">Lotes de la finca</div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <div style="display:flex;gap:5px;align-items:center">
+          <span style="font-size:10px;color:var(--ink4)">Finca:</span>
+          <select id="mapa-finca" class="fi" style="font-size:11px;padding:3px 8px;width:auto" onchange="mapaCambiarFinca(this.value)"></select>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center">
           <span style="font-size:10px;color:var(--ink4)">Vista:</span>
           <select id="mapa-vista" class="fi" style="font-size:11px;padding:3px 8px;width:auto" onchange="mapaAplicarVista(this.value)">
             <option value="hibrido">Satélite + carreteras</option>
@@ -671,6 +675,7 @@ nav>*{position:relative;z-index:1;}
     </div>
   </div>
   <div id="mapa-lista-lotes"></div>
+  <div id="mapa-fincas-fichas"></div>
 </div>
 
 <!-- ══ BLOQUES DE SIEMBRA ══ -->
@@ -812,6 +817,34 @@ nav>*{position:relative;z-index:1;}
 </div>
 
 <!-- ══ MODAL DATOS DE LOTE ══ -->
+<div class="overlay" id="modal-finca">
+  <div class="modal" style="width:480px">
+    <div class="modal-title"><span id="modal-finca-title">Datos de la finca</span><button class="modal-close" onclick="cerrarModal('modal-finca')">✕</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:11px">
+      <div class="field"><label>Nombre</label><input type="text" id="mf-nombre" class="fi" placeholder="Finca A"></div>
+      <div class="field"><label>Ubicación</label><input type="text" id="mf-ubicacion" class="fi" placeholder="Entre Pavón y El Amparo"></div>
+    </div>
+    <div class="field" style="margin-bottom:11px"><label>Arrendante (a quién se le alquila)</label><input type="text" id="mf-arrendante" class="fi" placeholder="Nombre de la persona o sociedad"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px;margin-bottom:4px">
+      <div class="field"><label>ha en el contrato</label><input type="number" id="mf-areacontrato" class="fi" step="0.1" min="0" placeholder="4"></div>
+      <div class="field"><label>ha que se pagan</label><input type="number" id="mf-areapaga" class="fi" step="0.1" min="0" placeholder="1.5"></div>
+      <div class="field"><label>₡ por ha al año</label><input type="number" id="mf-precioha" class="fi" step="1000" min="0" placeholder="325000"></div>
+    </div>
+    <div style="font-size:10px;color:var(--ink4);margin-bottom:11px;line-height:1.5">Se separan a propósito: el contrato puede declarar más hectáreas de las que realmente se pagan. El costo anual se calcula con las que se pagan.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:11px">
+      <div class="field"><label>Inicio del contrato</label><input type="date" id="mf-inicio" class="fi"></div>
+      <div class="field"><label>Vencimiento</label><input type="date" id="mf-fin" class="fi"></div>
+    </div>
+    <div class="field" style="margin-bottom:14px"><label>Notas</label><textarea id="mf-notas" class="fi" rows="3" placeholder="Folio real, condiciones especiales, quién firma..."></textarea></div>
+    <div style="display:flex;justify-content:space-between;gap:8px">
+      <button class="btn btn-danger" onclick="eliminarFinca()">🗑 Eliminar finca</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="cerrarModal('modal-finca')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarFinca()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="overlay" id="modal-lote">
   <div class="modal" style="width:460px">
     <div class="modal-title"><span id="modal-lote-title">Datos del lote</span><button class="modal-close" onclick="cerrarModal('modal-lote')">✕</button></div>
@@ -819,6 +852,10 @@ nav>*{position:relative;z-index:1;}
     <div class="field" style="margin-bottom:11px"><label>Proyecto vinculado (opcional)</label>
       <select id="ml-proj" class="fi"><option value="">— sin vincular —</option></select>
       <div style="font-size:10px;color:var(--ink4);margin-top:4px">Al vincular un proyecto, el lote muestra sus datos (cosecha, ingreso estimado, etc.) al tocarlo.</div>
+    </div>
+    <div class="field" style="margin-bottom:11px"><label>Finca</label>
+      <select id="ml-finca" class="fi"></select>
+      <div style="font-size:10px;color:var(--ink4);margin-top:4px">Tus fincas son propiedades separadas. Elegí en cuál está este lote.</div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:11px">
       <div class="field"><label>Estado</label>
@@ -1176,7 +1213,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.09.06.1';
+var APP_VERSION='2026.09.06.2';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -3277,10 +3314,12 @@ function lotesMios(){return (APP.lotes||[]).filter(function(l){return l.geo&&l.g
 
 // Borra los polígonos del mapa y los vuelve a pintar desde APP.lotes.
 function mapaRepintar(){
+  renderSelectFinca();
+  renderFichasFincas();
   if(!MAPA)return;
   Object.keys(MAPA_CAPAS).forEach(function(id){MAPA.removeLayer(MAPA_CAPAS[id]);});
   MAPA_CAPAS={};
-  lotesMios().forEach(function(l){
+  lotesVisibles().forEach(function(l){
     var col=colorDeLote(l);
     var poly=L.polygon(l.geo,{color:'#fff',weight:2,fillColor:col,fillOpacity:0.55});
     poly.addTo(MAPA);
@@ -3288,7 +3327,7 @@ function mapaRepintar(){
     poly.bindPopup(popupDatosLote(l.id),{maxWidth:260});
     MAPA_CAPAS[l.id]=poly;
   });
-  var n=lotesMios().length;
+  var n=lotesVisibles().length;
   document.getElementById('mapa-contador').textContent=n+' lote'+(n===1?'':'s')+' en el mapa';
   renderListaLotes();
 }
@@ -3367,6 +3406,13 @@ function abrirModalLote(id){
   }).map(function(p){
     return '<option value="'+p.id+'"'+((l&&l.projId===p.id)?' selected':'')+'>'+p.nombre+'</option>';
   }).join('');
+  // Finca: las 3 propiedades arrendadas. Un lote vive en una sola.
+  asegurarFincas();
+  var selF=document.getElementById('ml-finca');
+  selF.innerHTML='<option value="">— sin finca —</option>'+(APP.fincas||[]).map(function(f){
+    return '<option value="'+f.id+'"'+((l&&l.fincaId===f.id)?' selected':'')+'>'+f.nombre+'</option>';
+  }).join('');
+  if(!l&&MAPA_FINCA_SEL!=='todas'&&MAPA_FINCA_SEL!=='sin')selF.value=MAPA_FINCA_SEL;
   // Color picker
   loteColorSel=(l&&l.color)||'#1a5c2e';
   buildLoteColorPick();
@@ -3423,20 +3469,196 @@ function pintarAreaCalculada(geo){
   if(btn)btn.onclick=function(){document.getElementById('ml-area').value=ha.toFixed(2);};
 }
 
+// ══ FINCAS ════════════════════════════════════════════════════════════════
+// Una finca es una PROPIEDAD ARRENDADA, no una sociedad. Sobre una misma finca
+// pueden convivir proyectos de sociedades distintas (Finca A tiene Corona 1 de
+// una sociedad y Corona 2 de otra), por eso vive aparte y el lote solo la
+// referencia. Jerarquía: Finca -> Lote -> Proyecto.
+var FINCA_EDITANDO=null, MAPA_FINCA_SEL='todas';
+
+function fincasSemilla(){
+  return [
+    {id:1,nombre:'Finca A',ubicacion:'Entre Pavón y El Amparo, Los Chiles',arrendante:'',
+     areaContrato:0,areaPaga:0,precioHa:0,inicio:'',fin:'',
+     notas:'La maneja Lucas, pero la propiedad está a nombre de otra persona: el contrato se firmó directamente con ella. Falta confirmar nombre y condiciones.'},
+    {id:2,nombre:'Finca B',ubicacion:'El Amparo, Los Chiles',arrendante:'Servicios Agrícolas LUMISA S.R.L.',
+     areaContrato:4,areaPaga:1.5,precioHa:325000,inicio:'2026-02-01',fin:'2029-02-01',
+     notas:'Folio real 300472-000. Las 4 ha del contrato son para que el MAG vea el área declarada y cubra la expansión futura; se paga solo lo que se usa. Al vencer NO hay prórroga automática.'},
+    {id:3,nombre:'Finca C',ubicacion:'Entre Pavón y El Amparo, Los Chiles',arrendante:'',
+     areaContrato:0,areaPaga:0,precioHa:0,inicio:'',fin:'',
+     notas:'Alquiler con un tercero. Falta el detalle.'}
+  ];
+}
+// Crea las 3 fincas la primera vez y acomoda los lotes viejos que no tienen
+// finca asignada, adivinando por el nombre del proyecto. Es solo un punto de
+// partida: se puede cambiar desde el modal del lote.
+function asegurarFincas(){
+  if(!APP.fincas||!APP.fincas.length)APP.fincas=fincasSemilla();
+  (APP.lotes||[]).forEach(function(l){
+    if(l.fincaId)return;
+    var p=l.projId?(APP.proyectos||[]).find(function(x){return x.id===l.projId;}):null;
+    var n=(p&&p.nombre?p.nombre:'').toLowerCase();
+    if(/corona\s*[12]\b/.test(n))l.fincaId=1;
+    else if(/corona\s*[345678]\b/.test(n))l.fincaId=2;
+    else if(/vask|vasc/.test(n))l.fincaId=3;
+  });
+}
+function fincaPorId(id){return (APP.fincas||[]).find(function(f){return f.id===parseInt(id);})||null;}
+// Lotes que se pintan: los míos, filtrados por la finca elegida arriba.
+function lotesVisibles(){
+  var ls=lotesMios();
+  if(MAPA_FINCA_SEL==='todas')return ls;
+  if(MAPA_FINCA_SEL==='sin')return ls.filter(function(l){return !l.fincaId;});
+  return ls.filter(function(l){return String(l.fincaId)===String(MAPA_FINCA_SEL);});
+}
+function renderSelectFinca(){
+  asegurarFincas();
+  var sel=document.getElementById('mapa-finca');
+  if(!sel)return;
+  var mios=lotesMios();
+  var sinFinca=mios.filter(function(l){return !l.fincaId;}).length;
+  var h='<option value="todas">Todas</option>';
+  (APP.fincas||[]).forEach(function(f){
+    var n=mios.filter(function(l){return l.fincaId===f.id;}).length;
+    h+='<option value="'+f.id+'">'+f.nombre+' ('+n+')</option>';
+  });
+  if(sinFinca)h+='<option value="sin">Sin finca ('+sinFinca+')</option>';
+  sel.innerHTML=h;
+  sel.value=MAPA_FINCA_SEL;
+}
+function mapaCambiarFinca(v){
+  MAPA_FINCA_SEL=v;
+  mapaRepintar();
+  mapaEncuadrarFinca();
+}
+// Acerca el mapa a los lotes visibles. Las fincas están separadas entre sí, así
+// que sin esto habría que alejarse tanto que no se vería ninguna.
+function mapaEncuadrarFinca(){
+  if(!MAPA)return;
+  var ls=lotesVisibles();
+  if(!ls.length)return;
+  var pts=[];
+  ls.forEach(function(l){l.geo.forEach(function(c){pts.push(c);});});
+  if(pts.length)MAPA.fitBounds(L.latLngBounds(pts).pad(0.25));
+}
+// ── Ficha de arrendamiento por finca ──
+function renderFichasFincas(){
+  asegurarFincas();
+  var el=document.getElementById('mapa-fincas-fichas');
+  if(!el)return;
+  var mios=lotesMios();
+  var h='<div class="sec">Fincas y arrendamientos</div><div class="g3">';
+  (APP.fincas||[]).forEach(function(f){
+    var lotes=mios.filter(function(l){return l.fincaId===f.id;});
+    var usada=lotes.reduce(function(t,l){return t+(parseFloat(l.area)||0);},0);
+    var costo=(parseFloat(f.areaPaga)||0)*(parseFloat(f.precioHa)||0);
+    h+='<div class="card" style="margin-bottom:0"><div class="cb">';
+    h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+    h+='<div style="flex:1"><div style="font-size:13px;font-weight:700">'+f.nombre+'</div>';
+    h+='<div style="font-size:11px;color:var(--ink4)">'+(f.ubicacion||'sin ubicación')+'</div></div>';
+    h+='<button onclick="abrirModalFinca('+f.id+')" style="background:var(--fog);border:1px solid var(--border);color:var(--ink3);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✎</button>';
+    h+='</div>';
+    h+='<div style="font-size:11px;color:var(--ink3);line-height:1.7">';
+    h+='<div>Arrendante: '+(f.arrendante||'<span style="color:var(--ink4)">— falta —</span>')+'</div>';
+    if(costo>0)h+='<div>Alquiler: ₡'+Math.round(costo).toLocaleString('es-CR')+' al año ('+f.areaPaga+' ha × ₡'+Number(f.precioHa).toLocaleString('es-CR')+')</div>';
+    if(f.areaContrato&&f.areaPaga&&Number(f.areaContrato)!==Number(f.areaPaga))h+='<div style="color:var(--ink4)">El contrato declara '+f.areaContrato+' ha; se pagan '+f.areaPaga+'.</div>';
+    h+='<div>Lotes dibujados: '+lotes.length+(usada>0?' · '+usada.toFixed(2)+' ha medidas':'')+'</div>';
+    h+=avisoVencimiento(f);
+    h+='</div></div></div>';
+  });
+  h+='</div>';
+  el.innerHTML=h;
+}
+// Aviso cuando faltan menos de 6 meses para que se venza el arrendamiento.
+// El contrato de LUMISA no se renueva solo: hay que firmar uno nuevo.
+function avisoVencimiento(f){
+  if(!f.fin)return '';
+  var fin=new Date(f.fin+'T00:00:00');
+  if(isNaN(fin.getTime()))return '';
+  var dias=Math.round((fin-new Date())/86400000);
+  var txt=fin.toLocaleDateString('es-CR');
+  if(dias<0)return '<div style="color:#c0392b;font-weight:700">⚠ Vencido desde el '+txt+'</div>';
+  if(dias<=180)return '<div style="color:#c0392b;font-weight:700">⚠ Vence el '+txt+' — faltan '+dias+' días</div>';
+  return '<div style="color:var(--ink4)">Vence el '+txt+'</div>';
+}
+function abrirModalFinca(id){
+  asegurarFincas();
+  FINCA_EDITANDO=id?parseInt(id):null;
+  var f=FINCA_EDITANDO?fincaPorId(FINCA_EDITANDO):null;
+  document.getElementById('modal-finca-title').textContent=f?('✎ '+f.nombre):'+ Nueva finca';
+  document.getElementById('mf-nombre').value=f?(f.nombre||''):'';
+  document.getElementById('mf-ubicacion').value=f?(f.ubicacion||''):'';
+  document.getElementById('mf-arrendante').value=f?(f.arrendante||''):'';
+  document.getElementById('mf-areacontrato').value=f&&f.areaContrato?f.areaContrato:'';
+  document.getElementById('mf-areapaga').value=f&&f.areaPaga?f.areaPaga:'';
+  document.getElementById('mf-precioha').value=f&&f.precioHa?f.precioHa:'';
+  document.getElementById('mf-inicio').value=f?(f.inicio||''):'';
+  document.getElementById('mf-fin').value=f?(f.fin||''):'';
+  document.getElementById('mf-notas').value=f?(f.notas||''):'';
+  document.querySelector('#modal-finca .btn-danger').style.display=f?'':'none';
+  document.getElementById('modal-finca').classList.add('open');
+}
+function guardarFinca(){
+  var nombre=document.getElementById('mf-nombre').value.trim();
+  if(!nombre){toast('⚠ Poné un nombre a la finca',true);return;}
+  var datos={nombre:nombre,
+    ubicacion:document.getElementById('mf-ubicacion').value.trim(),
+    arrendante:document.getElementById('mf-arrendante').value.trim(),
+    areaContrato:parseFloat(document.getElementById('mf-areacontrato').value)||0,
+    areaPaga:parseFloat(document.getElementById('mf-areapaga').value)||0,
+    precioHa:parseFloat(document.getElementById('mf-precioha').value)||0,
+    inicio:document.getElementById('mf-inicio').value,
+    fin:document.getElementById('mf-fin').value,
+    notas:document.getElementById('mf-notas').value.trim()};
+  if(FINCA_EDITANDO){
+    var f=fincaPorId(FINCA_EDITANDO);
+    if(f)Object.keys(datos).forEach(function(k){f[k]=datos[k];});
+  } else {
+    if(!APP.fincas)APP.fincas=[];
+    datos.id=Math.max.apply(null,APP.fincas.map(function(x){return x.id;}).concat([0]))+1;
+    APP.fincas.push(datos);
+  }
+  saveL();
+  cerrarModal('modal-finca');
+  mapaRepintar();
+  guardarLotesEnSheet();
+  toast('✅ Finca guardada');
+}
+function eliminarFinca(){
+  if(!FINCA_EDITANDO)return;
+  var f=fincaPorId(FINCA_EDITANDO);
+  if(!f)return;
+  var conLotes=(APP.lotes||[]).filter(function(l){return l.fincaId===FINCA_EDITANDO;}).length;
+  var msg='¿Eliminar "'+f.nombre+'"?';
+  if(conLotes)msg+=' '+conLotes+' lote(s) quedarían sin finca. Los lotes NO se borran.';
+  if(!confirm(msg))return;
+  (APP.lotes||[]).forEach(function(l){if(l.fincaId===FINCA_EDITANDO)l.fincaId=null;});
+  APP.fincas=APP.fincas.filter(function(x){return x.id!==FINCA_EDITANDO;});
+  if(String(MAPA_FINCA_SEL)===String(FINCA_EDITANDO))MAPA_FINCA_SEL='todas';
+  saveL();
+  cerrarModal('modal-finca');
+  mapaRepintar();
+  guardarLotesEnSheet();
+  toast('🗑 Finca eliminada');
+}
+
 function guardarLote(){
+
   var nombre=document.getElementById('ml-nombre').value.trim();
   if(!nombre){toast('⚠ Poné un nombre al lote',true);return;}
   var projId=document.getElementById('ml-proj').value;
   var estado=document.getElementById('ml-estado').value;
   var area=parseFloat(document.getElementById('ml-area').value)||0;
+  var fincaId=document.getElementById('ml-finca').value;
+  fincaId=fincaId?parseInt(fincaId):null;
   if(LOTE_EDITANDO){
     var l=APP.lotes.find(function(x){return x.id===LOTE_EDITANDO;});
-    if(l){l.nombre=nombre;l.projId=projId?parseInt(projId):null;l.estado=estado;l.area=area;l.color=loteColorSel;}
+    if(l){l.nombre=nombre;l.projId=projId?parseInt(projId):null;l.estado=estado;l.area=area;l.color=loteColorSel;l.fincaId=fincaId;}
   } else {
     if(!LOTE_NUEVA_GEO){toast('⚠ Dibujá primero el lote en el mapa',true);return;}
     if(!APP.lotes)APP.lotes=[];
     var nid=Math.max.apply(null,APP.lotes.map(function(x){return x.id;}).concat([0]))+1;
-    APP.lotes.push({id:nid,nombre:nombre,geo:LOTE_NUEVA_GEO,projId:projId?parseInt(projId):null,estado:estado,area:area,color:loteColorSel});
+    APP.lotes.push({id:nid,nombre:nombre,geo:LOTE_NUEVA_GEO,projId:projId?parseInt(projId):null,estado:estado,area:area,color:loteColorSel,fincaId:fincaId});
     LOTE_NUEVA_GEO=null;
   }
   saveL();
@@ -3509,7 +3731,8 @@ function guardarLotesEnSheet(){
 function construirFilasConfig(){
   return [
     ['calibres_nacional',JSON.stringify(APP_CALIBRES||[])],
-    ['lotes_mapa',JSON.stringify(APP.lotes||[])]
+    ['lotes_mapa',JSON.stringify(APP.lotes||[])],
+    ['fincas',JSON.stringify(APP.fincas||[])]
   ];
 }
 
@@ -3517,7 +3740,7 @@ function construirFilasConfig(){
 function renderListaLotes(){
   var el=document.getElementById('mapa-lista-lotes');
   if(!el)return;
-  var lotes=lotesMios();
+  var lotes=lotesVisibles();
   if(!lotes.length){el.innerHTML='';return;}
   var h='<div class="sec">Lotes dibujados</div><div class="g3">';
   lotes.forEach(function(l){
@@ -3528,7 +3751,8 @@ function renderListaLotes(){
     h+='<div class="cb" style="display:flex;align-items:center;gap:10px">';
     h+='<div style="width:14px;height:14px;border-radius:4px;background:'+col+';flex-shrink:0"></div>';
     h+='<div style="flex:1"><div style="font-size:13px;font-weight:700">'+l.nombre+'</div>';
-    h+='<div style="font-size:11px;color:var(--ink4)">'+estadoTxt+(l.area?' · '+l.area+' ha':'')+(p?' · '+p.nombre:'')+'</div></div>';
+    var fc=l.fincaId?fincaPorId(l.fincaId):null;
+    h+='<div style="font-size:11px;color:var(--ink4)">'+(fc?fc.nombre+' · ':'')+estadoTxt+(l.area?' · '+l.area+' ha':'')+(p?' · '+p.nombre:'')+'</div></div>';
     h+='<button onclick="event.stopPropagation();abrirModalLote('+l.id+')" style="background:var(--fog);border:1px solid var(--border);color:var(--ink3);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✎</button>';
     h+='</div></div>';
   });
@@ -3604,6 +3828,12 @@ function cargarDesdeSheets(callback){
         var filaLotes=data.config.find(function(r){return r[0]==='lotes_mapa';});
         if(filaLotes&&filaLotes[1]){
           try{var lts=JSON.parse(filaLotes[1]);if(Array.isArray(lts))APP.lotes=lts;}catch(e){}
+        }
+        // Fincas: las propiedades arrendadas (key 'fincas'). Si la hoja todavía
+        // no las tiene, asegurarFincas() crea las tres por defecto.
+        var filaFincas=data.config.find(function(r){return r[0]==='fincas';});
+        if(filaFincas&&filaFincas[1]){
+          try{var fcs=JSON.parse(filaFincas[1]);if(Array.isArray(fcs)&&fcs.length)APP.fincas=fcs;}catch(e){}
         }
       }
       if(Array.isArray(data.transacciones)&&data.transacciones.length){
