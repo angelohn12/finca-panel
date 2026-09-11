@@ -111,6 +111,14 @@ nav{background:var(--forest);position:fixed;top:0;left:0;bottom:0;width:270px;z-
 .bal-sub{font-size:10.5px;font-weight:500;color:var(--ink4);margin-top:3px;font-variant-numeric:tabular-nums;}
 .bal-nota{font-size:11px;color:var(--ink4);line-height:1.55;padding:10px 16px;border-top:1px solid var(--border);background:var(--fog);}
 .bal-seccion{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink4);padding:10px 16px 4px;background:var(--card);display:flex;align-items:center;gap:7px;}
+/* Donut de gasto por categoria (Finanzas) — parte de un todo, maximo 6+Otros,
+   numero directo en la leyenda en vez de eje/leyenda de color suelta. */
+.donut-wrap{display:flex;align-items:center;gap:24px;padding:16px;flex-wrap:wrap;}
+.donut-leg{flex:1;min-width:180px;}
+.donut-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--fog);font-size:12px;}
+.donut-row:last-child{border-bottom:none;}
+.donut-row .dot{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:8px;flex-shrink:0;}
+.donut-val{font-weight:500;font-variant-numeric:tabular-nums;color:var(--ink2);white-space:nowrap;}
 .esq-drop .ico{font-size:26px;margin-bottom:6px;}
 .esq-drop h4{font-size:13.5px;font-weight:700;color:var(--ink);margin:0 0 3px;}
 .esq-drop p{font-size:12px;color:var(--ink4);margin:0;}
@@ -673,6 +681,10 @@ nav{background:var(--forest);position:fixed;top:0;left:0;bottom:0;width:270px;z-
   <div class="card">
     <div class="ch"><div class="ct">Ingresos vs gastos por mes</div><div class="ctag" id="fin-flujo-tag">últimos 6 meses</div></div>
     <div class="cb" id="fin-flujo"><div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">Cargando…</div></div>
+  </div>
+  <div class="card">
+    <div class="ch"><div class="ct">Gasto por categoría</div><div class="ctag" id="fin-donut-tag">$0</div></div>
+    <div id="fin-donut"><div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">Cargando…</div></div>
   </div>
   <div class="card">
     <div class="ch"><div class="ct">Real vs presupuestado</div><div class="ctag" id="fin-tag">$0</div></div>
@@ -1311,7 +1323,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.09.10.4';
+var APP_VERSION='2026.09.10.5';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -2370,16 +2382,51 @@ function svgFlujoMensual(fp){
     '<line x1="10" y1="140" x2="550" y2="140" stroke="var(--border)" stroke-width="1"/>'+
     bars+'</svg>';
 }
+
+// Donut de gasto por categoría — parte de un todo, máximo 6 rebanadas + "Otros"
+// (más que eso, el ojo deja de distinguir ángulos). r=15.9 es el radio clásico
+// que hace que la circunferencia dé ≈100, así el % se usa directo como
+// stroke-dasharray sin convertir. Recibe el mismo objeto {categoria: monto}
+// que ya arma renderFin() para las barras de presupuesto — no duplica datos.
+var DONUT_COLORS=['#c1603f','#1a5c2e','#76c442','#f0a500','#0984e3','#6c5ce7'];
+function svgDonutGastos(cats){
+  var entries=Object.keys(cats).map(function(k){return {nombre:k,monto:cats[k]};}).filter(function(e){return e.monto>0;})
+    .sort(function(a,b){return b.monto-a.monto;});
+  var tot=entries.reduce(function(s,e){return s+e.monto;},0);
+  if(tot<=0)return '<div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">Sin gastos registrados todavía.</div>';
+  var top=entries.slice(0,6);
+  if(entries.length>6){
+    var restoMonto=entries.slice(6).reduce(function(s,e){return s+e.monto;},0);
+    top.push({nombre:'Otros',monto:restoMonto});
+  }
+  var offset=0,segs='';
+  top.forEach(function(e,i){
+    var pct=(e.monto/tot)*100;
+    var col=e.nombre==='Otros'?'#9aa89e':DONUT_COLORS[i%DONUT_COLORS.length];
+    segs+='<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="'+col+'" stroke-width="6" stroke-dasharray="'+pct.toFixed(2)+' '+(100-pct).toFixed(2)+'" stroke-dashoffset="'+(-offset).toFixed(2)+'"/>';
+    offset+=pct;
+  });
+  var legend=top.map(function(e,i){
+    var col=e.nombre==='Otros'?'#9aa89e':DONUT_COLORS[i%DONUT_COLORS.length];
+    var pct=Math.round((e.monto/tot)*100);
+    return '<div class="donut-row"><span><span class="dot" style="background:'+col+'"></span>'+esc(e.nombre)+'</span><span class="donut-val">$'+Math.round(e.monto).toLocaleString('es-CR')+' · '+pct+'%</span></div>';
+  }).join('');
+  return '<div class="donut-wrap"><svg width="130" height="130" viewBox="0 0 42 42">'+
+    '<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="6"/>'+segs+
+    '</svg><div class="donut-leg">'+legend+'</div></div>';
+}
 function renderFin(){
   var fp=document.getElementById('fin-proj-sel').value;
   document.getElementById('fin-flujo').innerHTML=svgFlujoMensual(fp);
-  var proj=fp?APP.proyectos.find(function(p){return String(p.id)===fp;}):APP.proyectos[0];
-  if(!proj){document.getElementById('fin-bars').innerHTML='<p style="color:var(--ink4)">Seleccioná un proyecto.</p>';return;}
-  if(!proj.presupuesto)proj.presupuesto=JSON.parse(JSON.stringify(PRESUP_DEFAULT));
   var gts=APP.tx.filter(function(t){return t.tipo==='Gasto'&&(!fp||String(t.projId)===fp);});
   var cats={};gts.forEach(function(t){cats[t.cat]=(cats[t.cat]||0)+parseFloat(t.monto);});
   var tot=Object.values(cats).reduce(function(s,v){return s+v;},0);
+  document.getElementById('fin-donut-tag').textContent='$'+Math.round(tot).toLocaleString('es-CR');
+  document.getElementById('fin-donut').innerHTML=svgDonutGastos(cats);
   document.getElementById('fin-tag').textContent='Total real: $'+tot.toLocaleString('es-CR',{minimumFractionDigits:0});
+  var proj=fp?APP.proyectos.find(function(p){return String(p.id)===fp;}):APP.proyectos[0];
+  if(!proj){document.getElementById('fin-bars').innerHTML='<p style="color:var(--ink4)">Seleccioná un proyecto.</p>';return;}
+  if(!proj.presupuesto)proj.presupuesto=JSON.parse(JSON.stringify(PRESUP_DEFAULT));
   var presup=proj.presupuesto;var h='';
   h+='<div style="font-size:10px;color:var(--ink4);margin-bottom:12px">Presupuesto de <b>'+proj.nombre+'</b> · editá el monto de cada meta, se guarda para vos y Jonathan.</div>';
   Object.keys(presup).forEach(function(cat){
