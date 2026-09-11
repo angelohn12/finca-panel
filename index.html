@@ -63,6 +63,8 @@
   --tone-1:#1a5c2e;--tone-2:#5fa876;--tone-3:#c7d4c8;
   --terracota:#c1603f;
   --c-anyelo:#6c5ce7;--c-jonathan:#f0a500;--c-kenny:#00b894;
+  /* gramática financiera (avellana_estilo_visual): color solo con significado */
+  --entra:#2F7D5D;--debe:#B0741F;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--ink);min-height:100vh;position:relative;}
@@ -92,6 +94,15 @@ nav>*{position:relative;z-index:1;}
 .esq-drop{border:2px dashed var(--border);border-radius:var(--radius);background:var(--fog);padding:26px 18px;text-align:center;cursor:pointer;transition:all .15s;}
 .esq-drop:hover{border-color:var(--leaf2);background:var(--mist);}
 .esq-drop.drag{border-color:var(--leaf2);background:var(--mist);}
+/* Balance general JORISU (Finanzas) — gramática financiera: peso 500, tabular-nums, color solo con significado */
+.bal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--border);}
+.bal-tile{background:var(--card);padding:14px 16px;}
+.bal-label{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:var(--ink4);margin-bottom:6px;}
+.bal-value{font-size:19px;font-weight:500;color:var(--ink);letter-spacing:-.2px;font-variant-numeric:tabular-nums;}
+.bal-value.entra{color:var(--entra);}
+.bal-value.debe{color:var(--debe);}
+.bal-sub{font-size:10.5px;font-weight:500;color:var(--ink4);margin-top:3px;font-variant-numeric:tabular-nums;}
+.bal-nota{font-size:11px;color:var(--ink4);line-height:1.55;padding:10px 16px;border-top:1px solid var(--border);background:var(--fog);}
 .esq-drop .ico{font-size:26px;margin-bottom:6px;}
 .esq-drop h4{font-size:13.5px;font-weight:700;color:var(--ink);margin:0 0 3px;}
 .esq-drop p{font-size:12px;color:var(--ink4);margin:0;}
@@ -636,6 +647,13 @@ nav>*{position:relative;z-index:1;}
 <!-- ══ FINANZAS ══ -->
 <div class="page" id="p-finanzas">
   <div class="ph"><div><div class="pt">Finanzas</div><div class="ps">Presupuesto vs ejecución real · por proyecto</div></div></div>
+  <!-- Balance de la sociedad completa (no por proyecto) — alimentado por la
+       automatización de n8n que lee facturas del correo y escribe en Config
+       (ver memoria jorisu_sistema_contable). Oculta si aún no hay datos. -->
+  <div class="card" id="bal-jorisu-card" style="display:none">
+    <div class="ch"><div class="ct">JORISU — Balance general</div><div class="ctag" id="bal-jorisu-fecha">—</div></div>
+    <div class="cb" style="padding:0" id="bal-jorisu"></div>
+  </div>
   <div class="field" style="max-width:300px;margin-bottom:16px">
     <label>Proyecto</label>
     <select id="fin-proj-sel" class="fi" onchange="renderFin()"></select>
@@ -1281,7 +1299,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.09.07.3';
+var APP_VERSION='2026.09.10.1';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1628,7 +1646,7 @@ function pg(id,btn,skipHash){
     if(id==='mivista'){renderMiVista();}
     if(id==='misfinanzas'){renderMisFinanzas();}
     if(id==='movimientos'){poblarSelectProyectos();renderTx();renderKPIs();}
-    if(id==='finanzas'){poblarSelectProyectos();renderFin();}
+    if(id==='finanzas'){poblarSelectProyectos();renderFin();renderBalanceJorisu();}
     if(id==='portafolio'){renderPortafolio();}
     if(id==='terreno'){terrenoVista(TERRENO_VISTA);}
     if(id==='documentos'){renderDocProyectos();}
@@ -2354,6 +2372,54 @@ function renderFin(){
     h+='<div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:4px;transition:width 1s ease"></div></div></div>';
   });
   document.getElementById('fin-bars').innerHTML=h;
+}
+
+// Lee una llave que Costa Piña no edita (jorisu_*, tipo_cambio_*) del cajón
+// APP.configExtra — llaves que escribe la automatización de n8n de JORISU
+// (ver memoria jorisu_sistema_contable). Nunca se escriben desde aquí, solo
+// se leen para mostrar.
+function configExtraValor(key){
+  if(!APP.configExtra)return null;
+  var fila=APP.configExtra.find(function(r){return r[0]===key;});
+  return fila?fila[1]:null;
+}
+// Balance general de JORISU como sociedad completa (no por proyecto/Corona):
+// gastos totales facturados + ingresos de Corona 2/3 + utilidad e impuesto
+// estimados. Los números los calcula el workflow de n8n cada 12h; acá solo
+// se leen y se muestran — pendiente pedido explícitamente por Anyelo el
+// 10/09/2026 y que se había quedado sin hacer (ver jorisu_sistema_contable).
+function renderBalanceJorisu(){
+  var card=document.getElementById('bal-jorisu-card');
+  if(!card)return;
+  var gastosCRC=parseFloat(configExtraValor('jorisu_gastos_total_crc'));
+  var gastosUSD=parseFloat(configExtraValor('jorisu_gastos_total_usd'));
+  var ingresosCRC=parseFloat(configExtraValor('jorisu_ingresos_total_crc'));
+  var ingresosUSD=parseFloat(configExtraValor('jorisu_ingresos_total_usd'));
+  var utilidadCRC=parseFloat(configExtraValor('jorisu_utilidad_estimada_crc'));
+  var impuestoCRC=parseFloat(configExtraValor('jorisu_impuesto_estimado_crc'));
+  var facturas=configExtraValor('jorisu_facturas_cantidad');
+  var tc=parseFloat(configExtraValor('tipo_cambio_usd_crc'));
+  var tcFecha=configExtraValor('tipo_cambio_actualizado');
+  // Si la automatización todavía no ha corrido (o el dashboard es viejo y no
+  // tiene estas llaves), no mostrar una tarjeta de ceros engañosos.
+  if(isNaN(gastosCRC)&&isNaN(ingresosCRC)){card.style.display='none';return;}
+  card.style.display='';
+  function crc(v){return isNaN(v)?'—':'₡'+Math.round(v).toLocaleString('es-CR');}
+  function usd(v){return isNaN(v)?'':'≈ $'+Math.round(v).toLocaleString('es-CR');}
+  var utilClase=isNaN(utilidadCRC)?'':(utilidadCRC>=0?'entra':'debe');
+  var h='<div class="bal-grid">';
+  h+='<div class="bal-tile"><div class="bal-label">Gastos totales</div><div class="bal-value debe">'+crc(gastosCRC)+'</div><div class="bal-sub">'+usd(gastosUSD)+'</div></div>';
+  h+='<div class="bal-tile"><div class="bal-label">Ingresos · Corona 2+3</div><div class="bal-value'+(ingresosCRC>0?' entra':'')+'">'+crc(ingresosCRC)+'</div><div class="bal-sub">'+usd(ingresosUSD)+'</div></div>';
+  h+='<div class="bal-tile"><div class="bal-label">Utilidad estimada</div><div class="bal-value'+(utilClase?' '+utilClase:'')+'">'+crc(utilidadCRC)+'</div></div>';
+  h+='<div class="bal-tile"><div class="bal-label">Impuesto estimado</div><div class="bal-value">'+crc(impuestoCRC)+'</div><div class="bal-sub">10% aprox.</div></div>';
+  h+='</div>';
+  var notaPartes=[];
+  if(facturas)notaPartes.push(facturas+' facturas de gasto acumuladas');
+  if(!isNaN(tc))notaPartes.push('tipo de cambio ₡'+tc.toLocaleString('es-CR')+' por $1'+(tcFecha?' ('+tcFecha+')':''));
+  notaPartes.push('cifras aproximadas: tipo de cambio del día (no histórico) e impuesto con 10% plano — el contador ajusta con datos oficiales');
+  h+='<div class="bal-nota">'+notaPartes.join(' · ')+'.</div>';
+  document.getElementById('bal-jorisu').innerHTML=h;
+  document.getElementById('bal-jorisu-fecha').textContent=tcFecha?'act. '+tcFecha:'sociedad completa';
 }
 function actualizarPresupuesto(projId,cat,valor){
   var p=APP.proyectos.find(function(x){return x.id===projId;});
@@ -4278,7 +4344,7 @@ if(usuarioActual&&API_KEY){
     renderPortafolio();
     if(document.getElementById('p-mivista').classList.contains('active'))renderMiVista();
     if(document.getElementById('p-movimientos').classList.contains('active')){poblarSelectProyectos();renderTx();renderKPIs();}
-    if(document.getElementById('p-finanzas').classList.contains('active')){poblarSelectProyectos();renderFin();}
+    if(document.getElementById('p-finanzas').classList.contains('active')){poblarSelectProyectos();renderFin();renderBalanceJorisu();}
   });
 } else {
   // Sin sesión: memoria vacía, nada que mostrar. Solo se ve la pantalla de login.
