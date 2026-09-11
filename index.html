@@ -71,16 +71,23 @@ body{background:var(--bg);font-family:'Plus Jakarta Sans',sans-serif;font-size:1
 body::before{content:'';position:fixed;top:-15%;right:-8%;width:45%;height:60%;background:radial-gradient(ellipse,rgba(26,92,46,.09),transparent 70%);pointer-events:none;z-index:0;}
 body::after{content:'';position:fixed;bottom:-15%;left:-6%;width:38%;height:55%;background:radial-gradient(ellipse,rgba(193,96,63,.06),transparent 70%);pointer-events:none;z-index:0;}
 nav,.page{position:relative;z-index:1;}
-nav{background:var(--forest);display:flex;align-items:center;padding:0 24px;min-height:54px;gap:2px;position:sticky;top:0;z-index:300;border-bottom:2px solid var(--leaf);flex-wrap:nowrap;position:relative;overflow:hidden;}
-nav::before{content:'';position:absolute;top:-30%;right:-4%;width:220px;height:180%;pointer-events:none;opacity:.10;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 140'%3E%3Cpath d='M10 130 Q50 20 130 30 Q90 55 75 130' fill='none' stroke='%23ffffff' stroke-width='4'/%3E%3Cpath d='M60 135 Q100 45 175 38 Q130 65 118 135' fill='none' stroke='%23ffffff' stroke-width='4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-size:contain;}
-nav>*{position:relative;z-index:1;}
+/* ── Sidebar (rediseño 10/09/2026, aprobado julio 2026 — ver mockup revisado con Anyelo) ──
+   El elemento sigue siendo <nav> y conserva los ids/clases que ya usaba el JS
+   (#nav-menu, #nav-burger, .nav-tab, .nav-spacer, .pulse-wrap, etc.) — solo
+   cambia de barra horizontal arriba a columna fija a la izquierda. */
+body{padding-left:270px;}
+nav{background:var(--forest);position:fixed;top:0;left:0;bottom:0;width:270px;z-index:300;display:flex;flex-direction:column;padding:20px 0;overflow-y:auto;}
+.nav-topbar-mobile{display:none;}
 .nav-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--lime2),var(--lime));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-right:10px;flex-shrink:0;}
-.nav-brand{font-weight:800;font-size:16px;color:#fff;letter-spacing:-.3px;margin-right:20px;flex-shrink:0;}
+.nav-brand{font-weight:800;font-size:16px;color:#fff;letter-spacing:-.3px;flex-shrink:0;}
 .nav-brand span{color:var(--lime2);}
-.nav-tab{background:none;border:none;color:rgba(255,255,255,.45);padding:6px 13px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border-radius:6px;transition:all .15s;white-space:nowrap;}
-.nav-tab:hover{color:rgba(255,255,255,.8);background:rgba(255,255,255,.07);}
-.nav-tab.active{color:var(--lime2);background:rgba(118,196,66,.12);}
+.sb-brand{display:flex;align-items:center;padding:0 20px 20px;flex-shrink:0;}
+.nav-tab{background:none;border:none;border-right:3px solid transparent;color:rgba(255,255,255,.55);padding:10px 20px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;text-align:left;width:100%;display:block;}
+.nav-tab:hover{color:#fff;background:rgba(255,255,255,.06);}
+.nav-tab.active{color:var(--lime2);background:rgba(118,196,66,.12);border-right-color:var(--lime2);}
 .nav-spacer{flex:1;}
+.nav-bottom{padding:10px 20px 0;border-top:1px solid rgba(255,255,255,.08);margin-top:8px;}
+.nav-burger{display:none;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:18px;width:36px;height:36px;border-radius:8px;cursor:pointer;flex-shrink:0;}
 .subnav{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:10px;flex-wrap:wrap;}
 .subtab{background:none;border:1px solid transparent;color:var(--ink4);padding:7px 15px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer;border-radius:8px;transition:all .15s;white-space:nowrap;}
 .subtab:hover{color:var(--ink2);background:var(--fog);}
@@ -114,21 +121,18 @@ nav>*{position:relative;z-index:1;}
 .esq-tira b{position:relative;top:-46px;left:-30px;background:#e8590c;color:#fff;border-radius:50%;width:19px;height:19px;font-size:10px;line-height:19px;display:inline-block;border:2px solid #fff;}
 .subpage{display:none;}
 .subpage.active{display:block;}
-.nav-spacer-mobile-only{display:none;}
-.nav-menu{display:flex;align-items:center;gap:2px;flex:1;min-width:0;}
-.nav-burger{display:none;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:18px;width:36px;height:36px;border-radius:8px;cursor:pointer;flex-shrink:0;}
+/* Móvil: el sidebar se vuelve un cajón fuera de pantalla (mismo mecanismo
+   .open que ya usaba el menú horizontal — #nav-menu es el mismo elemento,
+   ahora es el <nav> completo). Una barra superior angosta con la marca y
+   la hamburguesa queda fija arriba para poder abrirlo. */
 @media (max-width:860px){
-  nav{padding:0 14px;flex-wrap:wrap;}
-  .nav-spacer-mobile-only{display:block;}
-  .nav-burger{display:block;}
-  .nav-menu{display:none;flex-direction:column;align-items:stretch;width:100%;flex-basis:100%;gap:4px;padding:10px 0 14px;}
-  .nav-menu.open{display:flex;}
-  .nav-menu .nav-tab{text-align:left;padding:10px 12px;}
-  .nav-menu .nav-spacer{display:none;}
-  .nav-menu #nav-usuario{margin:6px 0 2px 4px;}
-  .nav-menu .nav-sync-btn{width:100%;margin:2px 0;text-align:center;}
-  .nav-menu .pulse-wrap{padding:0 4px;margin:2px 0;}
-  .nav-menu .logout-btn{width:100%;margin:4px 0 0 !important;text-align:center;}
+  body{padding-left:0;padding-top:54px;}
+  nav{transform:translateX(-100%);transition:transform .2s ease;box-shadow:2px 0 20px rgba(0,0,0,.25);}
+  nav.open{transform:translateX(0);}
+  .nav-topbar-mobile{display:flex;align-items:center;gap:10px;position:fixed;top:0;left:0;right:0;height:54px;background:var(--forest);z-index:301;padding:0 16px;border-bottom:2px solid var(--leaf);}
+  .nav-burger{display:flex;align-items:center;justify-content:center;}
+  .nav-scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:299;}
+  .nav-scrim.open{display:block;}
 }
 .pulse-wrap{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--lime2);font-family:'JetBrains Mono',monospace;}
 .pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--lime2);animation:blink 2.5s infinite;}
@@ -454,25 +458,32 @@ nav>*{position:relative;z-index:1;}
   <button onclick="location.reload()" style="margin-left:8px;background:#3a2c00;color:#fff;border:none;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">Actualizar ahora</button>
 </div>
 
-<nav>
+<!-- Barra angosta solo-móvil: fija arriba, con la marca y la hamburguesa que
+     abre el sidebar (que en móvil vive fuera de pantalla, ver .nav-scrim). -->
+<div class="nav-topbar-mobile">
+  <button class="nav-burger" id="nav-burger" onclick="toggleNavMenu()" aria-label="Menú">☰</button>
   <div class="nav-icon">🍍</div>
   <div class="nav-brand">Costa <span>Piña</span></div>
-  <div class="nav-spacer nav-spacer-mobile-only"></div>
-  <button class="nav-burger" id="nav-burger" onclick="toggleNavMenu()" aria-label="Menú">☰</button>
-  <div class="nav-menu" id="nav-menu">
-    <button class="nav-tab active" id="tab-portafolio" onclick="pg('portafolio',this)">📁 Portafolio</button>
-    <button class="nav-tab" id="tab-mivista" onclick="pg('mivista',this)">👤 Mi Vista</button>
-    <button class="nav-tab" id="tab-movimientos" onclick="pg('movimientos',this)">💳 Movimientos</button>
-    <button class="nav-tab" id="tab-finanzas" onclick="pg('finanzas',this)">📊 Finanzas</button>
-    <button class="nav-tab" id="tab-terreno" onclick="pg('terreno',this)">🗺️ Terreno</button>
-    <button class="nav-tab" id="tab-documentos" onclick="pg('documentos',this)">📄 Documentos</button>
-    <button class="nav-tab" id="tab-misfinanzas" onclick="pg('misfinanzas',this)">💸 Mis Finanzas</button>
-    <div class="nav-spacer"></div>
-    <span id="nav-usuario" style="font-size:11px;color:rgba(255,255,255,.5);margin-right:10px;font-weight:600"></span>
-    <button onclick="sincronizarTodo()" class="nav-sync-btn" title="Empuja al instante cualquier cambio pendiente hacia Google Sheets. Normalmente no hace falta tocarlo — es automático." style="background:rgba(118,196,66,.15);border:1px solid rgba(118,196,66,.3);color:var(--lime2);padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:Plus Jakarta Sans,sans-serif;margin-right:8px">🔄 Sync Sheets</button>
-    <div class="pulse-wrap" id="pulse-wrap" title="Estado de conexión con Google Sheets"><div class="pulse-dot" id="pulse-dot"></div><span id="slbl">Conectando…</span></div>
-    <span id="app-version" style="font-size:9px;color:rgba(255,255,255,.3);font-family:'JetBrains Mono',monospace;margin-left:8px"></span>
-    <button class="logout-btn" onclick="doLogout()" style="margin-left:10px">↩ Salir</button>
+</div>
+<div class="nav-scrim" id="nav-scrim" onclick="toggleNavMenu()"></div>
+<nav id="nav-menu">
+  <div class="sb-brand"><div class="nav-icon">🍍</div><div class="nav-brand">Costa <span>Piña</span></div></div>
+  <button class="nav-tab active" id="tab-portafolio" onclick="pg('portafolio',this)">📁 Portafolio</button>
+  <button class="nav-tab" id="tab-mivista" onclick="pg('mivista',this)">👤 Mi Vista</button>
+  <button class="nav-tab" id="tab-movimientos" onclick="pg('movimientos',this)">💳 Movimientos</button>
+  <button class="nav-tab" id="tab-finanzas" onclick="pg('finanzas',this)">📊 Finanzas</button>
+  <button class="nav-tab" id="tab-terreno" onclick="pg('terreno',this)">🗺️ Terreno</button>
+  <button class="nav-tab" id="tab-documentos" onclick="pg('documentos',this)">📄 Documentos</button>
+  <button class="nav-tab" id="tab-misfinanzas" onclick="pg('misfinanzas',this)">💸 Mis Finanzas</button>
+  <div class="nav-spacer"></div>
+  <div class="nav-bottom">
+    <span id="nav-usuario" style="display:block;font-size:11px;color:rgba(255,255,255,.5);font-weight:600;margin-bottom:8px"></span>
+    <button onclick="sincronizarTodo()" class="nav-sync-btn" title="Empuja al instante cualquier cambio pendiente hacia Google Sheets. Normalmente no hace falta tocarlo — es automático." style="display:block;width:100%;background:rgba(118,196,66,.15);border:1px solid rgba(118,196,66,.3);color:var(--lime2);padding:6px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:Plus Jakarta Sans,sans-serif;margin-bottom:8px">🔄 Sync Sheets</button>
+    <div class="pulse-wrap" id="pulse-wrap" title="Estado de conexión con Google Sheets" style="margin-bottom:8px"><div class="pulse-dot" id="pulse-dot"></div><span id="slbl">Conectando…</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <span id="app-version" style="font-size:9px;color:rgba(255,255,255,.3);font-family:'JetBrains Mono',monospace"></span>
+      <button class="logout-btn" onclick="doLogout()">↩ Salir</button>
+    </div>
   </div>
 </nav>
 
@@ -1300,7 +1311,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.09.10.2';
+var APP_VERSION='2026.09.10.3';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1606,6 +1617,8 @@ function cerrarModal(id){document.getElementById(id).classList.remove('open');}
 
 function toggleNavMenu(){
   document.getElementById('nav-menu').classList.toggle('open');
+  var scrim=document.getElementById('nav-scrim');
+  if(scrim)scrim.classList.toggle('open');
 }
 
 // ── Cambio entre "Mapa de lotes" y "Bloques de siembra" ──
@@ -1638,6 +1651,7 @@ function pg(id,btn,skipHash){
   var botonTab=btn||document.getElementById('tab-'+id);
   if(botonTab)botonTab.classList.add('active');
   document.getElementById('nav-menu').classList.remove('open'); // cerrar menú móvil al navegar
+  var scrimEl=document.getElementById('nav-scrim');if(scrimEl)scrimEl.classList.remove('open');
   // Deep linking: la URL refleja la sección actual — permite compartir el link
   // directo a una pestaña y usar el botón "atrás" del navegador entre secciones.
   if(!skipHash && window.location.hash.slice(1)!==id){
