@@ -103,6 +103,7 @@ nav>*{position:relative;z-index:1;}
 .bal-value.debe{color:var(--debe);}
 .bal-sub{font-size:10.5px;font-weight:500;color:var(--ink4);margin-top:3px;font-variant-numeric:tabular-nums;}
 .bal-nota{font-size:11px;color:var(--ink4);line-height:1.55;padding:10px 16px;border-top:1px solid var(--border);background:var(--fog);}
+.bal-seccion{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink4);padding:10px 16px 4px;background:var(--card);display:flex;align-items:center;gap:7px;}
 .esq-drop .ico{font-size:26px;margin-bottom:6px;}
 .esq-drop h4{font-size:13.5px;font-weight:700;color:var(--ink);margin:0 0 3px;}
 .esq-drop p{font-size:12px;color:var(--ink4);margin:0;}
@@ -1299,7 +1300,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.09.10.1';
+var APP_VERSION='2026.09.10.2';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -2383,11 +2384,25 @@ function configExtraValor(key){
   var fila=APP.configExtra.find(function(r){return r[0]===key;});
   return fila?fila[1]:null;
 }
+// Nombres de proyecto que generan ingreso de JORISU como sociedad — mismo
+// criterio confirmado por Anyelo el 10/09/2026 y usado por el workflow de
+// n8n (config-financiero-jorisu-001, nodo "Armar config"). Si algún día se
+// suma un proyecto nuevo, avisar para agregarlo AQUÍ y en el workflow.
+var CORONAS_INGRESO_JORISU=['Corona 2','Corona 3'];
+
 // Balance general de JORISU como sociedad completa (no por proyecto/Corona):
-// gastos totales facturados + ingresos de Corona 2/3 + utilidad e impuesto
-// estimados. Los números los calcula el workflow de n8n cada 12h; acá solo
-// se leen y se muestran — pendiente pedido explícitamente por Anyelo el
-// 10/09/2026 y que se había quedado sin hacer (ver jorisu_sistema_contable).
+// gastos totales facturados + ingresos de Corona 2/3 + utilidad e impuesto,
+// en dos tiempos:
+// - "Facturado (real)": lo que ya escribió el workflow de n8n en Config
+//   (facturas de gasto leídas del correo, ingresos ya registrados como
+//   Transacciones tipo "Ingreso" en Corona 2/3). Casi siempre ₡0 de ingreso
+//   hoy porque JORISU todavía no vende.
+// - "Proyectado": usa el ingreso ESTIMADO de Corona 2/3 (la misma cuenta
+//   calcIngreso() que ya usa Portafolio, según ha/rendimiento/precios de
+//   cada proyecto) en vez de esperar a que haya facturas reales. Por eso
+//   está VIVO: si editás Corona 2 o Corona 3 en Portafolio, este número
+//   cambia solo, sin tocar nada acá — mismo principio de "todo interconec-
+//   tado" del resto del dashboard. Pedido por Anyelo el 10/09/2026.
 function renderBalanceJorisu(){
   var card=document.getElementById('bal-jorisu-card');
   if(!card)return;
@@ -2407,15 +2422,36 @@ function renderBalanceJorisu(){
   function crc(v){return isNaN(v)?'—':'₡'+Math.round(v).toLocaleString('es-CR');}
   function usd(v){return isNaN(v)?'':'≈ $'+Math.round(v).toLocaleString('es-CR');}
   var utilClase=isNaN(utilidadCRC)?'':(utilidadCRC>=0?'entra':'debe');
-  var h='<div class="bal-grid">';
+  var h='<div class="bal-seccion">📋 Facturado (real)</div>';
+  h+='<div class="bal-grid">';
   h+='<div class="bal-tile"><div class="bal-label">Gastos totales</div><div class="bal-value debe">'+crc(gastosCRC)+'</div><div class="bal-sub">'+usd(gastosUSD)+'</div></div>';
   h+='<div class="bal-tile"><div class="bal-label">Ingresos · Corona 2+3</div><div class="bal-value'+(ingresosCRC>0?' entra':'')+'">'+crc(ingresosCRC)+'</div><div class="bal-sub">'+usd(ingresosUSD)+'</div></div>';
-  h+='<div class="bal-tile"><div class="bal-label">Utilidad estimada</div><div class="bal-value'+(utilClase?' '+utilClase:'')+'">'+crc(utilidadCRC)+'</div></div>';
-  h+='<div class="bal-tile"><div class="bal-label">Impuesto estimado</div><div class="bal-value">'+crc(impuestoCRC)+'</div><div class="bal-sub">10% aprox.</div></div>';
+  h+='<div class="bal-tile"><div class="bal-label">Utilidad</div><div class="bal-value'+(utilClase?' '+utilClase:'')+'">'+crc(utilidadCRC)+'</div></div>';
+  h+='<div class="bal-tile"><div class="bal-label">Impuesto</div><div class="bal-value">'+crc(impuestoCRC)+'</div><div class="bal-sub">10% aprox.</div></div>';
   h+='</div>';
+
+  // ── Proyectado: mismo cálculo que Portafolio (calcIngreso), no lo que
+  // escribió n8n. Reacciona en vivo a ediciones de Corona 2/3.
+  var tcUsado=!isNaN(tc)?tc:TC_MERCADO;
+  var proyectosIngreso=APP.proyectos.filter(function(p){return CORONAS_INGRESO_JORISU.indexOf(p.nombre)!==-1;});
+  if(proyectosIngreso.length){
+    var ingresoProyUSD=proyectosIngreso.reduce(function(s,p){return s+calcIngreso(p);},0);
+    var ingresoProyCRC=ingresoProyUSD*tcUsado;
+    var gastosParaProy=isNaN(gastosCRC)?0:gastosCRC;
+    var utilidadProyCRC=ingresoProyCRC-gastosParaProy;
+    var impuestoProyCRC=Math.max(0,utilidadProyCRC)*0.10;
+    h+='<div class="bal-seccion">🔮 Proyectado <span class="badge-proy">según Portafolio</span></div>';
+    h+='<div class="bal-grid">';
+    h+='<div class="bal-tile"><div class="bal-label">Ingresos proy. · Corona 2+3</div><div class="bal-value'+(ingresoProyCRC>0?' entra':'')+'">'+crc(ingresoProyCRC)+'</div><div class="bal-sub">'+usd(ingresoProyUSD)+'</div></div>';
+    h+='<div class="bal-tile"><div class="bal-label">Utilidad proyectada</div><div class="bal-value'+(utilidadProyCRC>=0?' entra':' debe')+'">'+crc(utilidadProyCRC)+'</div></div>';
+    h+='<div class="bal-tile"><div class="bal-label">Impuesto proyectado</div><div class="bal-value">'+crc(impuestoProyCRC)+'</div><div class="bal-sub">10% aprox.</div></div>';
+    h+='</div>';
+  }
+
   var notaPartes=[];
   if(facturas)notaPartes.push(facturas+' facturas de gasto acumuladas');
   if(!isNaN(tc))notaPartes.push('tipo de cambio ₡'+tc.toLocaleString('es-CR')+' por $1'+(tcFecha?' ('+tcFecha+')':''));
+  notaPartes.push('lo proyectado usa el ingreso estimado de Corona 2 y 3 en Portafolio (editalo ahí y este número cambia solo)');
   notaPartes.push('cifras aproximadas: tipo de cambio del día (no histórico) e impuesto con 10% plano — el contador ajusta con datos oficiales');
   h+='<div class="bal-nota">'+notaPartes.join(' · ')+'.</div>';
   document.getElementById('bal-jorisu').innerHTML=h;
