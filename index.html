@@ -1311,7 +1311,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.09.10.3';
+var APP_VERSION='2026.09.10.4';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1586,6 +1586,15 @@ function loadL(){
     APP.proyectos=d.proyectos||[];APP.tx=d.tx||[];APP.nextId=d.nextId||1;APP.nextProjId=d.nextProjId||1;
     if(Array.isArray(d.lotes))APP.lotes=d.lotes;
     if(Array.isArray(d.fincas)&&d.fincas.length)APP.fincas=d.fincas;
+    // BUG CRÍTICO corregido 10/09/2026: esta función nunca restauraba
+    // APP.personal (salario, gastos, deudas de "Mis Finanzas"). Como esos
+    // datos viven SOLO en este dispositivo (no hay Sheets de respaldo, ver
+    // initPersonal()), cada recarga de página dejaba APP.personal vacío, y
+    // en cuanto se abría Mis Finanzas, initPersonal() lo veía "sin inicializar"
+    // y lo pisaba con los valores por defecto — borrando en silencio
+    // cualquier deuda/gasto/salario guardado antes. Reportado por Anyelo:
+    // una deuda registrada horas antes había desaparecido.
+    if(d.personal)APP.personal=d.personal;
   }}catch(e){}
 }
 
