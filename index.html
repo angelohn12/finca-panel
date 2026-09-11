@@ -4104,8 +4104,9 @@ function guardarLotesEnSheet(){
   })
   .catch(function(){toast('⚠ Lote guardado local — sin conexión con Sheets',true);});
 }
-// Config guarda varias claves (calibres + lotes); al reemplazar hay que
-// reescribir todas para no borrar las otras.
+// Config guarda varias claves (calibres + lotes + fincas, más otras que
+// escriben sistemas externos como la automatización de n8n de JORISU); al
+// reemplazar hay que reescribir todas para no borrar las otras.
 // Bandera de seguridad: hasta que Config no se haya leido con exito al menos
 // una vez, NO se puede escribir. construirFilasConfig() reescribe TODA la hoja
 // desde lo que hay en memoria; si se ejecuta antes de cargar (Sheets caido,
@@ -4113,11 +4114,15 @@ function guardarLotesEnSheet(){
 // los lotes y las fincas que si estaban guardados.
 var CONFIG_CARGADA=false;
 function construirFilasConfig(){
+  // APP.configExtra guarda las llaves que este dashboard no conoce/edita
+  // (ej. 'jorisu_gastos_total_crc', 'tipo_cambio_usd_crc') tal como llegaron
+  // al leer — se re-escriben sin tocarlas para no pisar el trabajo de otros
+  // sistemas que comparten esta misma hoja "Config".
   return [
     ['calibres_nacional',JSON.stringify(APP_CALIBRES||[])],
     ['lotes_mapa',JSON.stringify(APP.lotes||[])],
     ['fincas',JSON.stringify(APP.fincas||[])]
-  ];
+  ].concat(APP.configExtra||[]);
 }
 
 // Lista de lotes debajo del mapa (para editar/ver sin tener que clickear el polígono).
@@ -4201,10 +4206,11 @@ function cargarDesdeSheets(callback){
         APP.nextProjId=Math.max.apply(null,APP.proyectos.map(function(p){return p.id;}))+1;
       }
       // Config: valores compartidos que no son ni proyecto ni transacción.
-      // Formato de cada fila: [clave, valorJSON]. Hoy solo usamos
-      // 'calibres_nacional' (precios del mercado nacional por tamaño de fruta).
+      // Formato de cada fila: [clave, valorJSON]. El dashboard solo conoce
+      // ('lee y edita') 3 llaves: 'calibres_nacional', 'lotes_mapa', 'fincas'.
       if(Array.isArray(data.config)){
         CONFIG_CARGADA=true;
+        var LLAVES_CONOCIDAS=['calibres_nacional','lotes_mapa','fincas'];
         var filaCalibres=data.config.find(function(r){return r[0]==='calibres_nacional';});
         if(filaCalibres&&filaCalibres[1]){
           try{var c=JSON.parse(filaCalibres[1]);if(Array.isArray(c)&&c.length)APP_CALIBRES=c;}catch(e){}
@@ -4220,6 +4226,12 @@ function cargarDesdeSheets(callback){
         if(filaFincas&&filaFincas[1]){
           try{var fcs=JSON.parse(filaFincas[1]);if(Array.isArray(fcs)&&fcs.length)APP.fincas=fcs;}catch(e){}
         }
+        // Llaves que el dashboard NO conoce (ej. las que escribe la automatización
+        // de n8n: jorisu_*, tipo_cambio_*) — se guardan tal cual para que
+        // construirFilasConfig() las re-escriba sin perderlas. Si el dashboard
+        // las borrara al guardar, se perdería en silencio el trabajo de otro
+        // sistema que comparte la misma hoja "Config".
+        APP.configExtra=data.config.filter(function(r){return LLAVES_CONOCIDAS.indexOf(r[0])===-1;});
       }
       if(Array.isArray(data.transacciones)&&data.transacciones.length){
         var idsVistos=getSyncedIds();
