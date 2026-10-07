@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Costa Piña</title>
+<meta name="theme-color" content="#0d2e1a">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Costa Piña">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="icon" href="../favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  /* App de bolsillo de Costa Piña — para el celular de Anyelo.
+     Lee y escribe en la MISMA Google Sheet ("JORISU Master") que el panel de
+     escritorio: todo lo que se registra acá aparece allá y al revés. */
+  :root{
+    --forest:#0d2e1a;--leaf:#1a5c2e;--leaf2:#2d7a45;--lime:#76c442;--mist:#e8f5eb;--fog:#f2faf4;
+    --ink:#0d1f12;--ink2:#2d4a35;--ink3:#5a7a62;--bg:#f4f8f4;--card:#fff;--border:#e2ece3;
+    --entra:#2F7D5D;--debe:#B0741F;--rojo:#b3261e;--sun:#f0a500;
+    --abajo:env(safe-area-inset-bottom,0px);--arriba:env(safe-area-inset-top,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:'Plus Jakarta Sans',-apple-system,Segoe UI,Roboto,sans-serif;}
+  body{min-height:100vh;padding-bottom:calc(76px + var(--abajo));}
+  button,input,select,textarea{font-family:inherit;font-size:16px;}
+  .oculto{display:none !important}
+
+  /* ── barra de arriba ── */
+  .tope{position:sticky;top:0;z-index:20;background:var(--forest);color:#fff;
+    padding:calc(12px + var(--arriba)) 18px 12px;display:flex;align-items:center;gap:10px}
+  .tope h1{font-size:17px;font-weight:700;margin:0;flex:1;letter-spacing:.01em}
+  .tope h1 span{color:var(--lime)}
+  .estadoSync{font-size:12px;color:rgba(255,255,255,.75);display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:0;color:#fff;padding:6px 10px;border-radius:20px}
+  .punto{width:8px;height:8px;border-radius:50%;background:var(--lime);flex:0 0 auto}
+  .punto.pend{background:var(--sun)} .punto.sin{background:#999}
+
+  main{padding:14px 14px 0;max-width:640px;margin:0 auto}
+  .tarjeta{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:15px 16px;margin-bottom:12px}
+  .tarjeta h2{font-size:14px;font-weight:600;margin:0 0 10px;color:var(--ink2)}
+  .etq{font-size:12px;color:var(--ink3);margin:0 0 3px}
+  .grande{font-size:26px;font-weight:600;margin:0;font-variant-numeric:tabular-nums}
+  .sub{font-size:12.5px;color:var(--ink3);margin:4px 0 0;line-height:1.45}
+  .fila2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .entra{color:var(--entra)} .debe{color:var(--debe)}
+  .vacio{color:var(--ink3);font-size:14px;text-align:center;padding:18px 6px;line-height:1.5}
+
+  /* proyecto */
+  .proy{border-left:4px solid var(--leaf);}
+  .proyTop{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .proyNombre{font-size:16px;font-weight:700;margin:0}
+  .pill{font-size:11.5px;font-weight:600;background:var(--mist);color:var(--leaf);border-radius:20px;padding:3px 9px;white-space:nowrap}
+  .barra{height:8px;background:var(--fog);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:6px 0 2px}
+  .barra i{display:block;height:100%;background:var(--leaf2);border-radius:6px}
+  .barra i.pasado{background:var(--debe)}
+  .alerta{font-size:12.5px;line-height:1.45;background:#fff8e6;border:1px solid #f0d68a;border-radius:9px;padding:8px 10px;margin-top:10px;color:var(--ink2)}
+  .datos{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:10px}
+  .datos b{display:block;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+  .datos span{font-size:11.5px;color:var(--ink3)}
+
+  .mov{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+  .mov:last-child{border-bottom:0}
+  .mov .d{min-width:0} .mov .d small{display:block;color:var(--ink3);font-size:12px;margin-top:2px}
+  .mov .m{font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .pendiente{font-size:11px;font-weight:600;color:var(--debe);background:#fbf1e2;border-radius:10px;padding:1px 7px;margin-left:6px}
+
+  /* ── formulario ── */
+  .chips{display:flex;gap:8px;margin-bottom:12px}
+  .chip{flex:1;padding:11px 6px;border-radius:11px;border:1.5px solid var(--border);background:#fff;font-weight:600;color:var(--ink2)}
+  .chip.activo{background:var(--leaf);border-color:var(--leaf);color:#fff}
+  .campo{margin-bottom:12px}
+  .campo label{display:block;font-size:12.5px;color:var(--ink3);margin:0 0 5px;font-weight:500}
+  .campo input,.campo select,.campo textarea{width:100%;padding:12px 13px;border:1.5px solid var(--border);border-radius:11px;background:#fff;color:var(--ink);}
+  .campo input:focus,.campo select:focus,.campo textarea:focus{outline:none;border-color:var(--leaf2)}
+  .monto{display:flex;gap:8px}
+  .monto select{width:86px;flex:0 0 auto}
+  .monto input{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+  .equiv{font-size:12.5px;color:var(--ink3);margin-top:5px}
+  .btnGrande{width:100%;padding:15px;border:0;border-radius:13px;background:var(--leaf);color:#fff;font-size:17px;font-weight:700}
+  .btnGrande:active{background:var(--forest)}
+  .btnGrande:disabled{opacity:.6}
+  .btnSuave{width:100%;padding:12px;border:1.5px solid var(--border);border-radius:12px;background:#fff;color:var(--ink2);font-weight:600;margin-top:10px}
+  details.mas summary{font-size:14px;color:var(--leaf);font-weight:600;padding:4px 0 12px;cursor:pointer}
+
+  /* ── mapa ── */
+  #vista-mapa main{padding:0;max-width:none}
+  /* el mapa llena todo entre la barra de arriba y la de abajo */
+  #mapa{position:fixed;left:0;right:0;top:calc(51px + var(--arriba));bottom:calc(66px + var(--abajo));z-index:1}
+  .ubicacion{position:fixed;left:12px;right:12px;bottom:calc(86px + var(--abajo));z-index:500;background:#fff;border-radius:14px;
+    box-shadow:0 6px 24px rgba(0,0,0,.18);padding:12px 14px;display:flex;align-items:center;gap:12px}
+  .ubicacion .txt{flex:1;min-width:0;font-size:14px;line-height:1.4}
+  .ubicacion .txt b{display:block;font-size:16px}
+  .btnGps{border:0;border-radius:11px;background:var(--leaf);color:#fff;font-weight:700;padding:11px 14px;white-space:nowrap}
+  .etiquetaLote{background:rgba(13,46,26,.78);color:#fff;border:0;border-radius:6px;font-size:11px;font-weight:600;padding:2px 6px;box-shadow:none}
+  .etiquetaLote::before{display:none}
+
+  /* ── barra de abajo ── */
+  nav.abajo{position:fixed;left:0;right:0;bottom:0;z-index:600;background:#fff;border-top:1px solid var(--border);
+    display:flex;padding:6px 6px calc(6px + var(--abajo))}
+  nav.abajo button{flex:1;border:0;background:none;color:var(--ink3);font-size:11.5px;font-weight:600;padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:3px}
+  nav.abajo button svg{width:24px;height:24px}
+  nav.abajo button.activo{color:var(--leaf)}
+  nav.abajo .mas{color:#fff;}
+  nav.abajo .mas span.circulo{width:48px;height:48px;border-radius:50%;background:var(--leaf);display:flex;align-items:center;justify-content:center;margin-top:-22px;box-shadow:0 4px 14px rgba(26,92,46,.4)}
+  nav.abajo .mas.activo span.circulo{background:var(--forest)}
+
+  /* ── login ── */
+  #login{position:fixed;inset:0;z-index:1000;background:var(--forest);display:flex;align-items:center;justify-content:center;padding:24px}
+  #login .caja{background:#fff;border-radius:18px;padding:26px 22px;width:100%;max-width:360px}
+  #login h1{margin:0 0 4px;font-size:22px} #login p{margin:0 0 18px;color:var(--ink3);font-size:14px}
+  .error{color:var(--rojo);font-size:13.5px;margin:8px 0 0}
+
+  .aviso{position:fixed;left:50%;bottom:calc(92px + var(--abajo));transform:translateX(-50%);z-index:900;background:var(--forest);color:#fff;
+    padding:11px 16px;border-radius:12px;font-size:14px;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.25)}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="caja">
+    <h1>Costa Piña</h1>
+    <p>Tu finca en el bolsillo</p>
+    <div class="campo"><label for="clave">Contraseña del panel</label>
+      <input id="clave" type="password" autocomplete="current-password" enterkeyhint="go"></div>
+    <button class="btnGrande" id="btnEntrar" onclick="entrar()">Entrar</button>
+    <p class="error oculto" id="loginError"></p>
+  </div>
+</div>
+
+<header class="tope">
+  <h1>Costa <span>Piña</span></h1>
+  <button class="estadoSync" id="estadoSync" onclick="sincronizar(true)"><i class="punto" id="puntoSync"></i><span id="textoSync">…</span></button>
+</header>
+
+<!-- ── RESUMEN ── -->
+<section id="vista-resumen">
+  <main id="resumen"></main>
+</section>
+
+<!-- ── REGISTRAR ── -->
+<section id="vista-registrar" class="oculto">
+  <main>
+    <div class="tarjeta">
+      <div class="chips" role="group" aria-label="Tipo">
+        <button class="chip activo" data-tipo="Gasto" onclick="elegirTipo('Gasto')">Gasto</button>
+        <button class="chip" data-tipo="Ingreso" onclick="elegirTipo('Ingreso')">Ingreso</button>
+        <button class="chip" data-tipo="Aporte" onclick="elegirTipo('Aporte')">Aporte</button>
+      </div>
+      <div class="campo"><label for="fMonto">Monto</label>
+        <div class="monto">
+          <select id="fMoneda" onchange="mostrarEquivalente()"><option value="CRC">₡</option><option value="USD">$</option></select>
+          <input id="fMonto" type="text" inputmode="decimal" placeholder="0" oninput="mostrarEquivalente()">
+        </div>
+        <div class="equiv" id="fEquiv"></div>
+      </div>
+      <div class="campo"><label for="fProyecto">Proyecto</label><select id="fProyecto" onchange="cosechaPorProyecto()"></select></div>
+      <div class="campo"><label for="fCategoria">Categoría</label><select id="fCategoria"></select></div>
+      <div class="campo"><label for="fDesc">Descripción</label><input id="fDesc" type="text" placeholder="Ej: urea para Corona 2" autocomplete="off"></div>
+      <details class="mas">
+        <summary>Más datos (proveedor, fecha, cosecha, notas)</summary>
+        <div class="campo"><label for="fProveedor">Proveedor / cliente</label><input id="fProveedor" type="text" autocomplete="off"></div>
+        <div class="fila2">
+          <div class="campo"><label for="fFecha">Fecha</label><input id="fFecha" type="date"></div>
+          <div class="campo"><label for="fCosecha">Cosecha</label>
+            <select id="fCosecha"><option>PC</option><option>SC</option><option>General</option></select></div>
+        </div>
+        <div class="campo"><label for="fNotas">Notas</label><textarea id="fNotas" rows="2"></textarea></div>
+      </details>
+      <button class="btnGrande" id="btnGuardar" onclick="guardarMovimiento()">Guardar</button>
+      <p class="sub" style="text-align:center;margin-top:10px">Si no hay señal se guarda en el celular y se sube solo cuando vuelva.</p>
+    </div>
+  </main>
+</section>
+
+<!-- ── MAPA ── -->
+<section id="vista-mapa" class="oculto">
+  <main><div id="mapa"></div></main>
+  <div class="ubicacion">
+    <div class="txt" id="ubicacionTxt"><b>¿En qué lote estoy?</b>Tocá el botón para usar el GPS.</div>
+    <button class="btnGps" id="btnGps" onclick="alternarGps()">Ubicarme</button>
+  </div>
+</section>
+
+<nav class="abajo">
+  <button data-vista="resumen" class="activo" onclick="irA('resumen')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Resumen</button>
+  <button data-vista="registrar" class="mas" onclick="irA('registrar')"><span class="circulo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
+  <button data-vista="mapa" onclick="irA('mapa')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>Mapa</button>
+</nav>
+
+<div class="aviso oculto" id="aviso"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  Conexión — la misma API (Apps Script) que usa el panel de escritorio
+// ═══════════════════════════════════════════════════════════════
+var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX6qveSUh_PXnWQbEuBiC3Y80eEb10Ulu7-b5FiSckpNg/exec';
+var USUARIO = { id: 'anyelo', nombre: 'Anyelo' };   // la app es solo de Anyelo
+var LLAVES = { clave: 'cp_app_clave', datos: 'cp_app_datos', cola: 'cp_app_cola', sync: 'cp_app_sync' };
+
+// Mismos valores por defecto que el panel de escritorio (si se cambian allá,
+// cambiarlos acá): presupuesto, precios por canal, calibres y ciclos.
+var PRESUP_DEFAULT = { 'Alquiler terreno': 650, 'Preparación terreno': 1500, 'Compra semilla + Siembra Integral': 6000,
+  'Aplicaciones Paquete Técnico': 6000, 'Mantenimiento Finca + Boom': 3000, 'Cosecha': 3500 };
+var PRECIOS_BASE = [
+  { key: 'exp', precio: 0.45, pct: 60 }, { key: 'nac', precio: 0.35, pct: 15 },
+  { key: 'jug', precio: 0.25, pct: 15 }, { key: 'ind', precio: 0.20, pct: 10 }];
+var CALIBRES_DEFAULT = [
+  { precioCRC: 700, pct: 20 }, { precioCRC: 575, pct: 30 }, { precioCRC: 475, pct: 25 }, { precioCRC: 325, pct: 15 }, { precioCRC: 175, pct: 10 }];
+var DURACION_CICLO_MESES = { PC: 15, SC: 11, TC: 11, Otro: 14 };
+var DURACION_PC_GUIA_MESES = 12;
+var TC_POR_DEFECTO = 500; // el mismo del panel; se usa el de la automatización si existe
+var CATEGORIAS = {
+  Gasto: ['Alquiler terreno', 'Preparación terreno', 'Compra semilla + Siembra Integral', 'Aplicaciones Paquete Técnico', 'Mantenimiento Finca + Boom', 'Cosecha', 'Otro'],
+  Ingreso: ['Venta fruta', 'Otro'],
+  Aporte: ['Aporte de socios']
+};
+var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
+
+var D = { proyectos: [], tx: [], lotes: [], fincas: [], calibres: CALIBRES_DEFAULT, tc: TC_POR_DEFECTO, maxId: 0 };
+var TIPO = 'Gasto';
+
+// ── utilidades ──
+var ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return ESC[c]; }); }
+function leer(k, def) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch (e) { return def; } }
+function guardar(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function usd(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-CR'); }
+function crc(n) { return '₡' + Math.round(Number(n) || 0).toLocaleString('es-CR'); }
+function hoyISO() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function parseMonto(t) {
+  t = String(t || '').trim(); if (!t) return 0;
+  if (t.indexOf(',') !== -1) t = t.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  var n = Number(t); return isNaN(n) ? 0 : n;
+}
+function fechaCorta(f) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(f || ''));
+  if (!m) { var d0 = new Date(f); return isNaN(d0) ? '' : d0.getDate() + ' ' + MESES[d0.getMonth()]; }
+  return Number(m[3]) + ' ' + MESES[Number(m[2]) - 1];
+}
+var avisoTimer;
+function aviso(msg) {
+  var a = document.getElementById('aviso'); a.textContent = msg; a.classList.remove('oculto');
+  clearTimeout(avisoTimer); avisoTimer = setTimeout(function () { a.classList.add('oculto'); }, 3200);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Leer los datos (mismo formato de filas que el panel de escritorio)
+// ═══════════════════════════════════════════════════════════════
+function clave() { return leer(LLAVES.clave, ''); }
+
+function pedirDatos(llave) {
+  return fetch(SCRIPT_URL + '?accion=leer&key=' + encodeURIComponent(llave), { method: 'GET' })
+    .then(function (r) { return r.json(); });
+}
+
+function procesarDatos(data) {
+  var d = { proyectos: [], tx: [], lotes: [], fincas: [], calibres: CALIBRES_DEFAULT, tc: TC_POR_DEFECTO, maxId: 0 };
+  (data.proyectos || []).forEach(function (p) {
+    var socios = []; try { socios = JSON.parse(p[10] || '[]'); } catch (e) {}
+    var precios = JSON.parse(JSON.stringify(PRECIOS_BASE));
+    if (p[11]) { try { var g = JSON.parse(p[11]); precios = precios.map(function (b) { var x = g.find(function (y) { return y.key === b.key; }); return x ? { key: b.key, precio: x.precio, pct: x.pct } : b; }); } catch (e) {} }
+    var presupuesto = PRESUP_DEFAULT; if (p[14]) { try { presupuesto = JSON.parse(p[14]); } catch (e) {} }
+    d.proyectos.push({ id: parseInt(p[0]), nombre: p[1], ha: parseFloat(p[3]) || 1.5, plantas: parseInt(p[4]) || 65000,
+      inv: parseFloat(p[5]) || 0, ciclo: p[6], siembra: p[7], color: p[8] || '#1a5c2e', activo: p[9] === 'Sí',
+      socios: socios, precios: precios, rend: parseFloat(p[12]) || 100, mort: parseFloat(p[13]) || 5,
+      presupuesto: presupuesto, tipoSemilla: p[15] || 'corona' });
+  });
+  (data.config || []).forEach(function (r) {
+    try {
+      if (r[0] === 'lotes_mapa') { var l = JSON.parse(r[1]); if (Array.isArray(l)) d.lotes = l; }
+      if (r[0] === 'fincas') { var f = JSON.parse(r[1]); if (Array.isArray(f)) d.fincas = f; }
+      if (r[0] === 'calibres_nacional') { var c = JSON.parse(r[1]); if (Array.isArray(c) && c.length) d.calibres = c; }
+      if (r[0] === 'tipo_cambio_usd_crc') { var t = parseFloat(r[1]); if (t > 100) d.tc = t; }
+    } catch (e) {}
+  });
+  (data.transacciones || []).forEach(function (t) {
+    var id = parseInt(t[0]); if (id > d.maxId) d.maxId = id;
+    if (t[14]) return; // en la papelera del panel
+    var pid = parseInt(t[12]);
+    var proj = (!isNaN(pid) && pid) ? d.proyectos.find(function (p) { return p.id === pid; }) : null;
+    if (!proj) proj = d.proyectos.find(function (p) { return p.nombre === t[11]; });
+    d.tx.push({ id: id, projId: proj ? proj.id : null, fecha: t[1], tipo: t[2], cat: t[3], desc: t[4],
+      proveedor: t[5] || '', monto: Math.abs(parseFloat(t[8]) || 0), notas: t[9] || '' });
+  });
+  d.tx.sort(function (a, b) { return b.id - a.id; });
+  return d;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Cálculos (los mismos del panel de escritorio)
+// ═══════════════════════════════════════════════════════════════
+function miSocio(p) { return (p.socios || []).find(function (s) { return String(s.nombre || '').toLowerCase().indexOf(USUARIO.id) !== -1; }) || null; }
+function misProyectos() { return D.proyectos.filter(function (p) { return p.activo !== false && miSocio(p); }); }
+function duracionCiclo(p) { return (p.ciclo === 'PC' && p.tipoSemilla === 'guia') ? DURACION_PC_GUIA_MESES : (DURACION_CICLO_MESES[p.ciclo] || 14); }
+function mesesDesde(siembra) {
+  if (!siembra) return 1; var s = String(siembra).split('-'); var y = parseInt(s[0]), m = parseInt(s[1]);
+  var n = new Date(); return Math.max(1, Math.min((n.getFullYear() - y) * 12 + (n.getMonth() + 1 - m) + 1, 20));
+}
+function fechaCosecha(p) {
+  if (!p.siembra) return null; var s = String(p.siembra).split('-'); var y = parseInt(s[0]), m = parseInt(s[1]);
+  if (isNaN(y) || isNaN(m)) return null; return new Date(y, m - 1 + duracionCiclo(p), 1);
+}
+function ingresoEstimado(p) {
+  var ton = p.ha * (p.rend || 100) * (1 - (p.mort || 5) / 100);
+  var plantas = (p.plantas || 65000) * p.ha * (1 - (p.mort || 5) / 100);
+  var precioNac = D.calibres.reduce(function (s, c) { return s + (c.pct / 100) * c.precioCRC; }, 0);
+  return (p.precios || PRECIOS_BASE).reduce(function (s, pr) {
+    if (pr.key === 'nac') return s + plantas * (pr.pct / 100) * precioNac / TC_POR_DEFECTO;
+    return s + ton * (pr.pct / 100) * 1000 * pr.precio;
+  }, 0);
+}
+function sumaTx(projId, tipo) { return D.tx.filter(function (t) { return t.projId === projId && t.tipo === tipo; }).reduce(function (s, t) { return s + t.monto; }, 0); }
+function presupuestoTotal(p) { return Object.keys(p.presupuesto || {}).reduce(function (s, k) { return s + (parseFloat(p.presupuesto[k]) || 0); }, 0); }
+
+// Avisos de temporada (mismo criterio que el panel: ventana de precio piso
+// 1 jun–25 jul y riesgo de floración natural por el frío).
+function alertas(p) {
+  var out = []; var f = fechaCosecha(p);
+  if (f) { var m = f.getMonth() + 1; if (m === 6 || (m === 7 && f.getDate() <= 25)) out.push('La cosecha cae en la ventana de precio piso (jun–25 jul). Pensá en adelantar o atrasar el forzamiento.'); }
+  if (p.siembra && p.ciclo === 'PC' && p.tipoSemilla !== 'guia') {
+    var mm = parseInt(String(p.siembra).split('-')[1]); var edad = 13 - mm;
+    if (edad >= 8 && edad < 10) out.push('Riesgo de floración natural con el frío (≈' + edad + ' meses en enero). Confirmar con Jonathan si conviene forzar antes.');
+  }
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Resumen
+// ═══════════════════════════════════════════════════════════════
+function renderResumen() {
+  var caja = document.getElementById('resumen');
+  var proys = misProyectos();
+  var cola = leer(LLAVES.cola, []).filter(function (c) { return !c.listo; });
+  if (!proys.length && !D.tx.length) {
+    caja.innerHTML = '<div class="tarjeta"><div class="vacio">Todavía no hay datos. Revisá la conexión y tocá el indicador de arriba para actualizar.</div></div>';
+    return;
+  }
+
+  var tuGanancia = 0, proxima = null;
+  proys.forEach(function (p) {
+    var s = miSocio(p); var g = Math.max(0, (ingresoEstimado(p) - p.inv) * ((s && s.pctGanancia) || 0) / 100);
+    tuGanancia += g; var f = fechaCosecha(p);
+    if (f && f >= new Date(new Date().getFullYear(), new Date().getMonth(), 1) && (!proxima || f < proxima.f)) proxima = { f: f, p: p, g: g };
+  });
+  var mesActual = hoyISO().slice(0, 7);
+  var idsMios = proys.map(function (p) { return p.id; });
+  var gastoMes = D.tx.filter(function (t) { return t.tipo === 'Gasto' && idsMios.indexOf(t.projId) !== -1 && String(t.fecha).slice(0, 7) === mesActual; })
+    .reduce(function (s, t) { return s + t.monto; }, 0);
+
+  var h = '<div class="tarjeta"><div class="fila2">' +
+    '<div><p class="etq">Tu ganancia estimada</p><p class="grande entra">' + usd(tuGanancia) + '</p><p class="sub">de ' + proys.length + ' proyecto' + (proys.length === 1 ? '' : 's') + '</p></div>' +
+    '<div><p class="etq">Gastado este mes</p><p class="grande">' + usd(gastoMes) + '</p><p class="sub">≈ ' + crc(gastoMes * D.tc) + '</p></div>' +
+    '</div>';
+  if (proxima) {
+    var meses = Math.max(0, (proxima.f.getFullYear() - new Date().getFullYear()) * 12 + proxima.f.getMonth() - new Date().getMonth());
+    h += '<p class="sub" style="margin-top:12px;font-size:13.5px;color:var(--ink2)">Próxima cosecha: <b>' + esc(proxima.p.nombre) + '</b> · ' +
+      MESES[proxima.f.getMonth()] + ' ' + proxima.f.getFullYear() + (meses ? ' (en ' + meses + (meses === 1 ? ' mes' : ' meses') + ')' : ' (este mes)') + '</p>';
+  }
+  h += '</div>';
+
+  proys.slice().sort(function (a, b) { var fa = fechaCosecha(a), fb = fechaCosecha(b); return (fa ? fa : 9e15) - (fb ? fb : 9e15); }).forEach(function (p) {
+    var s = miSocio(p); var total = duracionCiclo(p); var mes = Math.min(mesesDesde(p.siembra), total);
+    var pres = presupuestoTotal(p); var gasto = sumaTx(p.id, 'Gasto'); var pct = pres > 0 ? Math.min(100, gasto / pres * 100) : 0;
+    var f = fechaCosecha(p); var ganancia = (ingresoEstimado(p) - p.inv) * ((s && s.pctGanancia) || 0) / 100;
+    h += '<div class="tarjeta proy" style="border-left-color:' + esc(p.color) + '">' +
+      '<div class="proyTop"><p class="proyNombre">' + esc(p.nombre) + '</p><span class="pill">' + esc(p.ciclo || '') + ' · mes ' + mes + ' de ' + total + '</span></div>' +
+      '<p class="sub">' + p.ha + ' ha' + (f ? ' · cosecha estimada ' + MESES[f.getMonth()] + ' ' + f.getFullYear() : '') + '</p>' +
+      '<div style="margin-top:10px"><p class="etq">Gastado vs presupuesto</p>' +
+      '<div class="barra"><i class="' + (gasto > pres && pres > 0 ? 'pasado' : '') + '" style="width:' + pct.toFixed(0) + '%"></i></div>' +
+      '<p class="sub" style="margin:0">' + usd(gasto) + ' de ' + usd(pres) + (pres > 0 ? ' (' + Math.round(gasto / pres * 100) + '%)' : '') + '</p></div>' +
+      '<div class="datos"><div><b class="entra">' + usd(Math.max(0, ganancia)) + '</b><span>tu ganancia est. (' + ((s && s.pctGanancia) || 0) + '%)</span></div>' +
+      '<div><b>' + usd(sumaTx(p.id, 'Aporte')) + '</b><span>aportes registrados</span></div></div>' +
+      alertas(p).map(function (a) { return '<div class="alerta">' + esc(a) + '</div>'; }).join('') +
+      '</div>';
+  });
+
+  // Últimos movimientos (incluye los que esperan señal)
+  var ultimos = cola.map(function (c) { return { pend: true, fecha: c.fecha, tipo: c.tipo, desc: c.desc, monto: c.montoUSD, cat: c.cat, projId: c.projId }; })
+    .concat(D.tx.filter(function (t) { return t.projId === null || idsMios.indexOf(t.projId) !== -1; })
+      .sort(function (a, b) { return String(b.fecha).slice(0, 10) < String(a.fecha).slice(0, 10) ? -1 : String(b.fecha).slice(0, 10) > String(a.fecha).slice(0, 10) ? 1 : b.id - a.id; })
+      .slice(0, 8));
+  h += '<div class="tarjeta"><h2>Últimos movimientos</h2>' + (ultimos.length ? ultimos.slice(0, 8).map(function (t) {
+    var p = D.proyectos.find(function (x) { return x.id === t.projId; });
+    return '<div class="mov"><div class="d">' + esc(t.desc || t.cat) + (t.pend ? '<span class="pendiente">sin subir</span>' : '') +
+      '<small>' + fechaCorta(t.fecha) + ' · ' + esc(p ? p.nombre : 'General') + ' · ' + esc(t.cat || '') + '</small></div>' +
+      '<div class="m ' + (t.tipo === 'Gasto' ? '' : 'entra') + '">' + (t.tipo === 'Gasto' ? '−' : '+') + usd(t.monto) + '</div></div>';
+  }).join('') : '<div class="vacio">Sin movimientos todavía.</div>') + '</div>';
+
+  caja.innerHTML = h;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Registrar (con cola para cuando no hay señal)
+// ═══════════════════════════════════════════════════════════════
+function elegirTipo(t) {
+  TIPO = t;
+  document.querySelectorAll('.chip[data-tipo]').forEach(function (b) { b.classList.toggle('activo', b.dataset.tipo === t); });
+  document.getElementById('fCategoria').innerHTML = CATEGORIAS[t].map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('');
+  document.getElementById('fDesc').placeholder = t === 'Gasto' ? 'Ej: urea para Corona 2' : t === 'Ingreso' ? 'Ej: venta de fruta' : 'Ej: aporte de capital';
+}
+
+function llenarProyectos() {
+  var sel = document.getElementById('fProyecto'); var antes = sel.value;
+  sel.innerHTML = misProyectos().map(function (p) { return '<option value="' + p.id + '">' + esc(p.nombre) + '</option>'; }).join('') + '<option value="">General (sin proyecto)</option>';
+  if (antes !== '' && [].some.call(sel.options, function (o) { return o.value === antes; })) sel.value = antes;
+  cosechaPorProyecto();
+}
+
+function cosechaPorProyecto() {
+  var p = D.proyectos.find(function (x) { return String(x.id) === document.getElementById('fProyecto').value; });
+  var c = p && (p.ciclo === 'PC' || p.ciclo === 'SC') ? p.ciclo : 'General';
+  document.getElementById('fCosecha').value = c;
+}
+
+function mostrarEquivalente() {
+  var m = parseMonto(document.getElementById('fMonto').value); var mon = document.getElementById('fMoneda').value;
+  document.getElementById('fEquiv').textContent = !m ? '' :
+    (mon === 'CRC' ? '≈ $' + (m / D.tc).toFixed(2) + ' a ₡' + Math.round(D.tc) + ' por dólar' : '≈ ' + crc(m * D.tc));
+}
+
+function limpiarFormulario() {
+  ['fMonto', 'fDesc', 'fProveedor', 'fNotas'].forEach(function (id) { document.getElementById(id).value = ''; });
+  document.getElementById('fFecha').value = hoyISO();
+  mostrarEquivalente();
+}
+
+function guardarMovimiento() {
+  var monto = parseMonto(document.getElementById('fMonto').value);
+  var mon = document.getElementById('fMoneda').value;
+  var desc = document.getElementById('fDesc').value.trim() || (TIPO === 'Aporte' ? 'Aporte de capital' : '');
+  if (!(monto > 0)) { aviso('Poné el monto.'); return; }
+  if (!desc) { aviso('Poné una descripción corta.'); return; }
+  var pid = document.getElementById('fProyecto').value;
+  var montoUSD = mon === 'CRC' ? Math.round(monto / D.tc * 100) / 100 : monto;
+  // Igual que el panel: el monto en colones queda al inicio de las notas, y
+  // una referencia corta evita subir dos veces lo mismo si se corta la señal.
+  var ref = Math.random().toString(36).slice(2, 8);
+  var notas = ((mon === 'CRC' ? '[₡' + Math.round(monto).toLocaleString('es-CR') + ' @ ₡' + Math.round(D.tc) + '/$] ' : '') +
+    document.getElementById('fNotas').value.trim()).trim();
+  notas = (notas ? notas + ' ' : '') + '(cel ' + ref + ')';
+  var cola = leer(LLAVES.cola, []);
+  cola.push({ ref: ref, tipo: TIPO, projId: pid ? parseInt(pid) : null, fecha: document.getElementById('fFecha').value || hoyISO(),
+    cat: document.getElementById('fCategoria').value, desc: desc, proveedor: document.getElementById('fProveedor').value.trim(),
+    cosecha: document.getElementById('fCosecha').value, montoUSD: montoUSD, notas: notas, listo: false });
+  guardar(LLAVES.cola, cola);
+  limpiarFormulario();
+  aviso(navigator.onLine ? 'Guardando…' : 'Guardado en el celular. Se sube cuando haya señal.');
+  irA('resumen');
+  renderResumen(); pintarEstado();
+  sincronizar(false);
+}
+
+// Sube lo que está en la cola. Antes de cada subida se leen los datos frescos:
+// el número (id) se calcula ahí, como el panel, y si una subida anterior sí
+// llegó aunque se cortó la respuesta, se reconoce por su referencia y no se
+// repite.
+var SINCRONIZANDO = false;
+function sincronizar(manual) {
+  if (SINCRONIZANDO) return Promise.resolve();
+  var llave = clave(); if (!llave) return Promise.resolve();
+  if (!navigator.onLine) { pintarEstado(); if (manual) aviso('Sin señal: se usa lo último que se bajó.'); return Promise.resolve(); }
+  SINCRONIZANDO = true; pintarEstado('Actualizando…');
+  return pedirDatos(llave).then(function (data) {
+    if (!data || data.ok === false) throw new Error('clave');
+    var crudo = data;
+    var pendientes = leer(LLAVES.cola, []).filter(function (c) { return !c.listo; });
+    var cadena = Promise.resolve();
+    var maxId = procesarDatos(crudo).maxId;
+    pendientes.forEach(function (c) {
+      cadena = cadena.then(function () {
+        var yaEsta = (crudo.transacciones || []).some(function (t) { return String(t[9] || '').indexOf('(cel ' + c.ref + ')') !== -1; });
+        if (yaEsta) return marcarListo(c.ref);
+        var p = D.proyectos.find(function (x) { return x.id === c.projId; }) || procesarDatos(crudo).proyectos.find(function (x) { return x.id === c.projId; });
+        var id = ++maxId;
+        var fila = [id, c.fecha, c.tipo, c.cat, c.desc, c.proveedor, USUARIO.nombre, c.cosecha,
+          (c.tipo === 'Gasto' ? -c.montoUSD : c.montoUSD), c.notas, USUARIO.nombre, p ? p.nombre : '', c.projId || '', USUARIO.nombre + ' (celular)', '', ''];
+        return fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ key: llave, accion: 'agregar_fila', hoja: 'Transacciones', fila: fila }) })
+          .then(function (r) { return r.json(); })
+          .then(function (res) { if (res && res.ok === false) throw new Error(res.mensaje || 'no se guardó'); return marcarListo(c.ref); });
+      });
+    });
+    return cadena.then(function () { return pendientes.length ? pedirDatos(llave) : crudo; });
+  }).then(function (data) {
+    D = procesarDatos(data);
+    guardar(LLAVES.datos, data); guardar(LLAVES.sync, Date.now());
+    var subidos = leer(LLAVES.cola, []).filter(function (c) { return c.listo; }).length;
+    guardar(LLAVES.cola, leer(LLAVES.cola, []).filter(function (c) { return !c.listo; }));
+    if (subidos) aviso(subidos === 1 ? 'Movimiento guardado en la Sheet.' : subidos + ' movimientos guardados en la Sheet.');
+    else if (manual) aviso('Datos al día.');
+  }).catch(function (e) {
+    if (String(e && e.message) === 'clave') { salir(); return; }
+    if (manual) aviso('No se pudo conectar. Se reintenta solo.');
+  }).then(function () { SINCRONIZANDO = false; pintarTodo(); });
+}
+
+function marcarListo(ref) {
+  var cola = leer(LLAVES.cola, []); cola.forEach(function (c) { if (c.ref === ref) c.listo = true; }); guardar(LLAVES.cola, cola);
+}
+
+function pintarEstado(texto) {
+  var pend = leer(LLAVES.cola, []).filter(function (c) { return !c.listo; }).length;
+  var punto = document.getElementById('puntoSync');
+  punto.className = 'punto' + (pend ? ' pend' : (navigator.onLine ? '' : ' sin'));
+  var ult = leer(LLAVES.sync, 0);
+  document.getElementById('textoSync').textContent = texto ||
+    (pend ? pend + ' sin subir' : (!navigator.onLine ? 'Sin señal' : (ult ? 'Al día ' + new Date(ult).toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' }) : 'Actualizar')));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Mapa — ¿en qué lote estoy?
+// ═══════════════════════════════════════════════════════════════
+var MAPA = null, CAPA_LOTES = null, MARCA = null, CIRCULO = null, VIGILANCIA = null;
+
+function lotesMios() {
+  return (D.lotes || []).filter(function (l) {
+    if (!l.geo || !l.geo.length) return false;
+    if (!l.projId) return true;
+    var p = D.proyectos.find(function (x) { return x.id === l.projId; });
+    return !p || !!miSocio(p);
+  });
+}
+
+function iniciarMapa() {
+  if (!window.L) { document.getElementById('ubicacionTxt').innerHTML = '<b>Mapa sin conexión</b>Abrí la app una vez con señal para cargarlo.'; return; }
+  if (!MAPA) {
+    MAPA = L.map('mapa', { zoomControl: false, attributionControl: false });
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 17 }).addTo(MAPA);
+    L.control.zoom({ position: 'topright' }).addTo(MAPA);
+    CAPA_LOTES = L.featureGroup().addTo(MAPA);
+  }
+  CAPA_LOTES.clearLayers();
+  lotesMios().forEach(function (l) {
+    var p = D.proyectos.find(function (x) { return x.id === l.projId; });
+    var color = l.color || (p && p.color) || '#76c442';
+    L.polygon(l.geo, { color: '#fff', weight: 2, fillColor: color, fillOpacity: 0.45 })
+      .bindTooltip(esc(l.nombre), { permanent: true, direction: 'center', className: 'etiquetaLote' })
+      .addTo(CAPA_LOTES);
+  });
+  setTimeout(function () {
+    MAPA.invalidateSize();
+    if (MARCA) return;
+    if (CAPA_LOTES.getLayers().length) MAPA.fitBounds(CAPA_LOTES.getBounds(), { padding: [30, 30] });
+    else MAPA.setView([10.8172, -84.6297], 14);
+  }, 50);
+}
+
+// Punto dentro de polígono (rayo) — geo viene como [[lat, lng], ...]
+function dentro(lat, lng, geo) {
+  var adentro = false;
+  for (var i = 0, j = geo.length - 1; i < geo.length; j = i++) {
+    var yi = geo[i][0], xi = geo[i][1], yj = geo[j][0], xj = geo[j][1];
+    if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) adentro = !adentro;
+  }
+  return adentro;
+}
+// Distancia (m) del punto al borde más cercano del lote
+function distanciaAlLote(lat, lng, geo) {
+  var R = 6371000, cosLat = Math.cos(lat * Math.PI / 180), min = Infinity;
+  function xy(a, b) { return [(b - lng) * Math.PI / 180 * R * cosLat, (a - lat) * Math.PI / 180 * R]; }
+  for (var i = 0; i < geo.length; i++) {
+    var a = xy(geo[i][0], geo[i][1]), b = xy(geo[(i + 1) % geo.length][0], geo[(i + 1) % geo.length][1]);
+    var dx = b[0] - a[0], dy = b[1] - a[1], t = (dx || dy) ? Math.max(0, Math.min(1, -(a[0] * dx + a[1] * dy) / (dx * dx + dy * dy))) : 0;
+    var px = a[0] + t * dx, py = a[1] + t * dy; min = Math.min(min, Math.sqrt(px * px + py * py));
+  }
+  return min;
+}
+
+function alternarGps() {
+  if (VIGILANCIA !== null) {
+    navigator.geolocation.clearWatch(VIGILANCIA); VIGILANCIA = null;
+    document.getElementById('btnGps').textContent = 'Ubicarme';
+    return;
+  }
+  if (!navigator.geolocation) { aviso('Este celular no permite usar el GPS aquí.'); return; }
+  document.getElementById('btnGps').textContent = 'Detener';
+  document.getElementById('ubicacionTxt').innerHTML = '<b>Buscando tu ubicación…</b>Puede tardar unos segundos.';
+  var primera = true;
+  VIGILANCIA = navigator.geolocation.watchPosition(function (pos) {
+    var lat = pos.coords.latitude, lng = pos.coords.longitude, prec = Math.round(pos.coords.accuracy);
+    if (MAPA) {
+      if (!MARCA) {
+        MARCA = L.circleMarker([lat, lng], { radius: 8, color: '#fff', weight: 3, fillColor: '#1a73e8', fillOpacity: 1 }).addTo(MAPA);
+        CIRCULO = L.circle([lat, lng], { radius: prec, color: '#1a73e8', weight: 1, fillOpacity: 0.12 }).addTo(MAPA);
+      } else { MARCA.setLatLng([lat, lng]); CIRCULO.setLatLng([lat, lng]).setRadius(prec); }
+      if (primera) { MAPA.setView([lat, lng], Math.max(MAPA.getZoom(), 17)); primera = false; }
+    }
+    var lotes = lotesMios(), en = null, cerca = null;
+    lotes.forEach(function (l) {
+      if (dentro(lat, lng, l.geo)) en = l;
+      else { var d = distanciaAlLote(lat, lng, l.geo); if (!cerca || d < cerca.d) cerca = { l: l, d: d }; }
+    });
+    var txt;
+    if (en) {
+      var p = D.proyectos.find(function (x) { return x.id === en.projId; });
+      txt = '<b>Estás en ' + esc(en.nombre) + '</b>' + esc(p ? p.nombre : '') + (en.area ? ' · ' + Number(en.area).toFixed(2) + ' ha' : '') + ' · GPS ±' + prec + ' m';
+    } else if (cerca) {
+      txt = '<b>Fuera de los lotes</b>A ' + (cerca.d < 1000 ? Math.round(cerca.d) + ' m' : (cerca.d / 1000).toFixed(1) + ' km') + ' de ' + esc(cerca.l.nombre) + ' · GPS ±' + prec + ' m';
+    } else {
+      txt = '<b>Tu ubicación</b>No hay lotes medidos en el mapa todavía · GPS ±' + prec + ' m';
+    }
+    document.getElementById('ubicacionTxt').innerHTML = txt;
+  }, function (err) {
+    document.getElementById('ubicacionTxt').innerHTML = '<b>No se pudo usar el GPS</b>' +
+      (err.code === 1 ? 'Dale permiso de ubicación a la app en Ajustes.' : 'Probá de nuevo al aire libre.');
+    navigator.geolocation.clearWatch(VIGILANCIA); VIGILANCIA = null;
+    document.getElementById('btnGps').textContent = 'Ubicarme';
+  }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Navegación, entrada y arranque
+// ═══════════════════════════════════════════════════════════════
+function irA(vista) {
+  ['resumen', 'registrar', 'mapa'].forEach(function (v) { document.getElementById('vista-' + v).classList.toggle('oculto', v !== vista); });
+  document.querySelectorAll('nav.abajo button').forEach(function (b) { b.classList.toggle('activo', b.dataset.vista === vista); });
+  if (vista === 'mapa') iniciarMapa();
+  if (vista === 'registrar') { llenarProyectos(); mostrarEquivalente(); }
+  window.scrollTo(0, 0);
+}
+
+function pintarTodo() { renderResumen(); llenarProyectos(); pintarEstado(); if (MAPA && !document.getElementById('vista-mapa').classList.contains('oculto')) iniciarMapa(); }
+
+function entrar() {
+  var llave = document.getElementById('clave').value;
+  var err = document.getElementById('loginError'); err.classList.add('oculto');
+  if (!llave) return;
+  var btn = document.getElementById('btnEntrar'); btn.disabled = true; btn.textContent = 'Verificando…';
+  pedirDatos(llave).then(function (data) {
+    if (!data || data.ok !== true) throw new Error('clave');
+    guardar(LLAVES.clave, llave); guardar(LLAVES.datos, data); guardar(LLAVES.sync, Date.now());
+    D = procesarDatos(data);
+    document.getElementById('clave').value = '';
+    document.getElementById('login').classList.add('oculto');
+    pintarTodo();
+    sincronizar(false);
+  }).catch(function (e) {
+    err.textContent = String(e && e.message) === 'clave' ? 'Contraseña incorrecta.' : 'Sin conexión. Para entrar la primera vez hace falta señal.';
+    err.classList.remove('oculto');
+  }).then(function () { btn.disabled = false; btn.textContent = 'Entrar'; });
+}
+
+function salir() {
+  try { localStorage.removeItem(LLAVES.clave); localStorage.removeItem(LLAVES.datos); } catch (e) {}
+  document.getElementById('login').classList.remove('oculto');
+  document.getElementById('loginError').textContent = 'La contraseña cambió o ya no es válida. Entrá de nuevo.';
+  document.getElementById('loginError').classList.remove('oculto');
+}
+
+document.getElementById('clave').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
+window.addEventListener('online', function () { sincronizar(false); });
+window.addEventListener('offline', function () { pintarEstado(); });
+document.addEventListener('visibilitychange', function () { if (!document.hidden) sincronizar(false); });
+
+elegirTipo('Gasto');
+document.getElementById('fFecha').value = hoyISO();
+if (clave()) {
+  document.getElementById('login').classList.add('oculto');
+  var guardados = leer(LLAVES.datos, null);
+  if (guardados) D = procesarDatos(guardados);
+  pintarTodo();
+  sincronizar(false);
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+</script>
+</body>
+</html>
