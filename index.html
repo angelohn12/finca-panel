@@ -414,6 +414,16 @@ nav{background:var(--forest);position:fixed;top:0;left:0;bottom:0;width:270px;z-
 .bq-part-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border);}
 .bq-part-row:last-child{border-bottom:none;}
 .bq-kbd{background:var(--fog);border:1px solid var(--border);border-radius:4px;padding:0 5px;font-family:'JetBrains Mono',monospace;}
+.fz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;}
+.fz-chip{display:flex;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;}
+.fz-sw{width:14px;border-radius:4px;border:2px solid;flex:none;}
+.fz-chip-t{font-weight:700;font-size:14px;}
+.fz-chip-s{font-size:11.5px;color:var(--ink4);margin:2px 0 8px;}
+.fz-chip-f{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;}
+.fz-chip-f .fi{padding:4px 7px;font-size:12px;width:auto;}
+.fz-cos{color:var(--ink3);}
+#fz-tbody td{padding:7px 12px;border-top:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;}
+#fz-tbody tr{cursor:pointer;}
 #bq-print-preview img{max-width:100%;display:block;margin:0 auto;box-shadow:var(--shadow);border-radius:6px;}
 </style>
 </head>
@@ -699,6 +709,7 @@ nav{background:var(--forest);position:fixed;top:0;left:0;bottom:0;width:270px;z-
   <div class="subnav">
     <button class="subtab active" id="stab-mapa" onclick="terrenoVista('mapa')">🗺️ Mapa de lotes</button>
     <button class="subtab" id="stab-bloques" onclick="terrenoVista('bloques')">🧩 Bloques de siembra</button>
+    <button class="subtab" id="stab-forza" onclick="terrenoVista('forza')">🎯 Planos Forza</button>
   </div>
 
 <div class="subpage active" id="sp-mapa">
@@ -898,6 +909,26 @@ nav{background:var(--forest);position:fixed;top:0;left:0;bottom:0;width:270px;z-
       </div>
     </div>
   </div>
+</div>
+<div class="subpage" id="sp-forza">
+  <div class="ph">
+    <div><div class="pt">Planos Forza</div><div class="ps">Qué bloque lleva qué aplicación de Forza, con cosecha estimada · tocá un bloque para resaltarlo</div></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select id="fz-plano" class="fi" style="width:auto"></select>
+    </div>
+  </div>
+  <div class="card" style="overflow:hidden">
+    <div id="fz-sin-foto" style="display:none;padding:8px 16px;font-size:12px;color:var(--ink4);background:var(--fog);border-bottom:1px solid var(--border)">📷 Falta la foto limpia del dron de este plano: se muestran las formas sobre fondo oscuro. Cuando se cargue, aparecen sobre la plantación.</div>
+    <div id="fz-canvas-wrap" style="padding:12px;background:var(--fog)"><canvas id="fz-canvas" style="display:block;margin:0 auto;border-radius:8px;box-shadow:var(--shadow);cursor:pointer;max-width:100%"></canvas></div>
+  </div>
+  <div class="sec">Aplicaciones</div>
+  <div id="fz-leyenda" class="fz-grid"></div>
+  <div style="display:flex;gap:8px;align-items:center;margin:10px 0 18px;flex-wrap:wrap">
+    <input type="number" id="fz-nueva-n" class="fi" min="1" placeholder="N.º de Forza" style="width:130px">
+    <button class="btn btn-ghost btn-sm" id="fz-btn-nueva">+ Agregar Forza</button>
+  </div>
+  <div class="sec">Bloques</div>
+  <div class="card"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;padding:8px 12px">Bloque</th><th style="text-align:left;padding:8px 12px">Forza</th><th style="text-align:left;padding:8px 12px">Cosecha est.</th></tr></thead><tbody id="fz-tbody"></tbody></table></div></div>
 </div>
 </div>
 
@@ -1323,7 +1354,7 @@ var SCRIPT_URL='https://script.google.com/macros/s/AKfycbwXcifOIRXjC3AHXnSNCQUfX
 // se compara contra version.json (el mismo sitio publicado) cada pocos
 // minutos; si detecta un número mayor, avisa con un botón para recargar.
 // Así Jonathan nunca se queda usando una versión vieja sin saberlo.
-var APP_VERSION='2026.09.10.5';
+var APP_VERSION='2026.10.10.1';
 document.addEventListener('DOMContentLoaded',function(){
   var v=document.getElementById('app-version');if(v)v.textContent='v'+APP_VERSION;
 });
@@ -1434,7 +1465,7 @@ function aplicarRol(){
   // si no hay hash o Jonathan no tiene acceso a esa pestaña, va a Portafolio.
   // 'mapa' y 'bloques' siguen en la lista por los enlaces guardados de antes:
   // pg() los redirige a 'terreno' en la sub-vista correcta.
-  var PESTANAS_VALIDAS=['portafolio','mivista','movimientos','finanzas','terreno','mapa','bloques','documentos','guia','misfinanzas'];
+  var PESTANAS_VALIDAS=['portafolio','mivista','movimientos','finanzas','terreno','mapa','bloques','forza','documentos','guia','misfinanzas'];
   var idInicial=window.location.hash.slice(1);
   if(!PESTANAS_VALIDAS.includes(idInicial)||(soloEmpresa&&idInicial==='misfinanzas'))idInicial='portafolio';
   pg(idInicial);
@@ -1598,6 +1629,7 @@ function loadL(){
     APP.proyectos=d.proyectos||[];APP.tx=d.tx||[];APP.nextId=d.nextId||1;APP.nextProjId=d.nextProjId||1;
     if(Array.isArray(d.lotes))APP.lotes=d.lotes;
     if(Array.isArray(d.fincas)&&d.fincas.length)APP.fincas=d.fincas;
+    if(d.bloquesForza&&Array.isArray(d.bloquesForza.planos))APP.bloquesForza=d.bloquesForza;
     // BUG CRÍTICO corregido 10/09/2026: esta función nunca restauraba
     // APP.personal (salario, gastos, deudas de "Mis Finanzas"). Como esos
     // datos viven SOLO en este dispositivo (no hay Sheets de respaldo, ver
@@ -1647,7 +1679,7 @@ function toggleNavMenu(){
 var TERRENO_VISTA='mapa';
 function terrenoVista(v){
   TERRENO_VISTA=v;
-  ['mapa','bloques'].forEach(function(x){
+  ['mapa','bloques','forza'].forEach(function(x){
     var sp=document.getElementById('sp-'+x), st=document.getElementById('stab-'+x);
     if(sp)sp.classList.toggle('active',x===v);
     if(st)st.classList.toggle('active',x===v);
@@ -1657,6 +1689,8 @@ function terrenoVista(v){
     // Leaflet mide el contenedor al crearse; si estaba escondido queda en cero
     // y el mapa sale gris. Hay que avisarle que ya tiene tamaño.
     if(typeof MAPA!=='undefined'&&MAPA)setTimeout(function(){MAPA.invalidateSize();},60);
+  } else if(v==='forza'){
+    initForza();
   } else {
     initBloques();
   }
@@ -1665,7 +1699,7 @@ function terrenoVista(v){
 function pg(id,btn,skipHash){
   // Compatibilidad: los enlaces guardados a #mapa o #bloques ahora abren
   // Terreno en la sub-vista que corresponde.
-  if(id==='mapa'||id==='bloques'){TERRENO_VISTA=id;id='terreno';}
+  if(id==='mapa'||id==='bloques'||id==='forza'){TERRENO_VISTA=id;id='terreno';}
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active');});
   document.getElementById('p-'+id).classList.add('active');
@@ -4294,7 +4328,7 @@ function construirFilasConfig(){
     ['calibres_nacional',JSON.stringify(APP_CALIBRES||[])],
     ['lotes_mapa',JSON.stringify(APP.lotes||[])],
     ['fincas',JSON.stringify(APP.fincas||[])]
-  ].concat(APP.configExtra||[]);
+  ].concat(APP.bloquesForza?[['bloques_forza',JSON.stringify(APP.bloquesForza)]]:(APP._bfCrudo?[APP._bfCrudo]:[])).concat(APP.configExtra||[]);
 }
 
 // Lista de lotes debajo del mapa (para editar/ver sin tener que clickear el polígono).
@@ -4382,7 +4416,7 @@ function cargarDesdeSheets(callback){
       // ('lee y edita') 3 llaves: 'calibres_nacional', 'lotes_mapa', 'fincas'.
       if(Array.isArray(data.config)){
         CONFIG_CARGADA=true;
-        var LLAVES_CONOCIDAS=['calibres_nacional','lotes_mapa','fincas'];
+        var LLAVES_CONOCIDAS=['calibres_nacional','lotes_mapa','fincas','bloques_forza'];
         var filaCalibres=data.config.find(function(r){return r[0]==='calibres_nacional';});
         if(filaCalibres&&filaCalibres[1]){
           try{var c=JSON.parse(filaCalibres[1]);if(Array.isArray(c)&&c.length)APP_CALIBRES=c;}catch(e){}
@@ -4392,6 +4426,12 @@ function cargarDesdeSheets(callback){
         if(filaLotes&&filaLotes[1]){
           try{var lts=JSON.parse(filaLotes[1]);if(Array.isArray(lts))APP.lotes=lts;}catch(e){}
         }
+        // Planos Forza: bloques + aplicación de Forza por plano (key 'bloques_forza').
+        var filaBF=data.config.find(function(r){return r[0]==='bloques_forza';});
+        if(filaBF&&filaBF[1]){
+          try{var bf=JSON.parse(filaBF[1]);if(bf&&Array.isArray(bf.planos))APP.bloquesForza=bf;}catch(e){APP._bfCrudo=filaBF;}
+        }
+        if(typeof fzRender==='function'&&FZ_INITED)fzRender();
         // Fincas: las propiedades arrendadas (key 'fincas'). Si la hoja todavía
         // no las tiene, asegurarFincas() crea las tres por defecto.
         var filaFincas=data.config.find(function(r){return r[0]==='fincas';});
@@ -4473,6 +4513,209 @@ function refrescarDesdeSheetsSiPosible(callback){
    la foto que el usuario carga, se numera, y se exporta como PNG
    (hoja de impresión con tabla/área/norte/escala) o CSV/copiar.
    Un bloque puede tener varios "pedazos" separados por una calle. */
+/* ══════════════════════════════════════════════════════════════
+   PLANOS FORZA — qué bloque lleva qué aplicación de Forza
+   ══════════════════════════════════════════════════════════════
+   Los bloques y su Forza viven en Config (llave 'bloques_forza'), igual que
+   lotes y fincas: se comparten entre dispositivos y no se pierden al cerrar.
+   Las formas están en coordenadas 0–1 sobre la foto, así que sirven con
+   cualquier resolución de la misma foto. La foto limpia del dron va en
+   /planos/<plano>.jpg; si todavía no está, se dibuja sobre fondo oscuro.
+   Cosecha estimada = fecha de Forza + mesesACosecha (dato de Jonathan: ~5). */
+var FZ_INITED=false,FZ_PLANO=null,FZ_IMG={},FZ_SEL=null;
+var FZ_PALETA=[
+  {f:'rgba(36,16,72,.66)',s:'#ffffff',c:'#2a1450',sw:'#2a1450'},
+  {f:'rgba(255,196,0,.42)',s:'#ffd21f',c:'#a57f00',sw:'#ffc400'},
+  {f:'rgba(36,150,255,.45)',s:'#4aa8ff',c:'#0b4a80',sw:'#2496ff'},
+  {f:'rgba(110,200,70,.45)',s:'#7fd34f',c:'#2f6d14',sw:'#6ec846'},
+  {f:'rgba(255,90,140,.45)',s:'#ff7aa6',c:'#8a1c46',sw:'#ff5a8c'}
+];
+var FZ_SEMILLA={"v":1,"mesesACosecha":5,"planos":[{"id":"corona1","nombre":"Corona 1","aspect":1.3354,"foto":"planos/corona1.jpg","bloques":[{"num":1,"forza":38,"partes":[[[0.5818,0.0759],[0.6066,0.0696],[0.6682,0.0918],[0.7393,0.1108],[0.7927,0.1361],[0.8258,0.1582],[0.8258,0.1899],[0.8057,0.2089],[0.7867,0.1899],[0.7749,0.182],[0.7867,0.1661],[0.769,0.1456],[0.7334,0.1297],[0.7038,0.1203],[0.6445,0.1108],[0.5972,0.0949]],[[0.7607,0.1899],[0.7808,0.1835],[0.8009,0.1978],[0.8057,0.2247],[0.7927,0.2373],[0.7654,0.231]]],"lbl":[0.8045,0.1661]},{"num":2,"forza":38,"partes":[[[0.4775,0.1899],[0.5237,0.1772],[0.5498,0.1297],[0.5735,0.0728],[0.5533,0.068],[0.5261,0.1044],[0.5,0.1535]]],"lbl":[0.5261,0.1345]},{"num":3,"forza":38,"partes":[[[0.705,0.2215],[0.7062,0.1741],[0.7216,0.1345],[0.7571,0.1377],[0.7713,0.1661],[0.7571,0.2089],[0.7334,0.2247]]],"lbl":[0.7358,0.1741]},{"num":4,"forza":38,"partes":[[[0.6173,0.2152],[0.6386,0.1218],[0.6445,0.1187],[0.7038,0.1203],[0.7097,0.1424],[0.6884,0.2089]]],"lbl":[0.6635,0.1693]},{"num":5,"forza":38,"partes":[[[0.5273,0.2009],[0.5735,0.1028],[0.6351,0.1013],[0.6386,0.1266],[0.609,0.2089],[0.5675,0.2089]]],"lbl":[0.5853,0.1519]},{"num":6,"forza":38,"partes":[[[0.4668,0.2073],[0.5,0.2104],[0.4964,0.2373],[0.4668,0.3006],[0.4313,0.3639],[0.4017,0.4272],[0.3744,0.4905],[0.3803,0.5617],[0.391,0.6092],[0.4194,0.6614],[0.455,0.6835],[0.5261,0.7041],[0.5735,0.7136],[0.7749,0.7231],[0.7986,0.7674],[0.8057,0.8259],[0.6682,0.8228],[0.5735,0.8196],[0.5024,0.8038],[0.4313,0.7722],[0.372,0.7516],[0.3543,0.7278],[0.327,0.6646],[0.3246,0.6013],[0.3152,0.5459],[0.3128,0.5063],[0.3365,0.4589],[0.3602,0.4035],[0.3839,0.3639],[0.4017,0.3165],[0.4254,0.269],[0.4491,0.2294]]],"lbl":[0.5415,0.7453]},{"num":7,"forza":39,"partes":[[[0.4017,0.557],[0.4313,0.5475],[0.763,0.5506],[0.7867,0.5854],[0.7867,0.6646],[0.763,0.6915],[0.5201,0.6835],[0.4254,0.6487],[0.404,0.5934]]],"lbl":[0.6043,0.6155]},{"num":8,"forza":39,"partes":[[[0.3981,0.4509],[0.4194,0.4335],[0.7749,0.4304],[0.7891,0.5063],[0.7749,0.538],[0.4313,0.5364],[0.3981,0.5253]]],"lbl":[0.5948,0.4826]},{"num":9,"forza":39,"partes":[[[0.4573,0.3386],[0.763,0.3386],[0.7808,0.3718],[0.7796,0.413],[0.4787,0.4225],[0.4336,0.4114]]],"lbl":[0.6066,0.3766]},{"num":10,"forza":39,"partes":[[[0.4787,0.269],[0.769,0.2627],[0.7867,0.269],[0.7891,0.3212],[0.4905,0.3291],[0.4692,0.3038]]],"lbl":[0.6291,0.2943]},{"num":11,"forza":38,"partes":[[[0.5047,0.2215],[0.5344,0.2057],[0.5853,0.2152],[0.7844,0.2484],[0.7867,0.2627],[0.5498,0.2595],[0.5083,0.2611]]],"lbl":[0.6161,0.2373]},{"num":12,"forza":39,"partes":[[[0.3803,0.7595],[0.4313,0.7722],[0.5024,0.8038],[0.5735,0.8196],[0.6682,0.8228],[0.8057,0.8259],[0.8081,0.8861],[0.7986,0.9367],[0.7275,0.9525],[0.5498,0.9272],[0.3661,0.8892],[0.3448,0.8465],[0.3661,0.807]],[[0.2773,0.8165],[0.327,0.8481],[0.2962,0.9415],[0.2405,0.9082]]],"lbl":[0.6209,0.8782]},{"num":13,"forza":39,"partes":[[[0.3424,0.9494],[0.3661,0.9051],[0.3957,0.9051],[0.7749,0.9889],[0.7784,0.9968],[0.3448,0.9953]]],"lbl":[0.5024,0.962]}]},{"id":"vasconia1","nombre":"Vasconia 1","aspect":1.7778,"foto":"planos/vasconia1.jpg","bloques":[{"num":1,"forza":43,"partes":[[[0.5234,0.3981],[0.5365,0.3796],[0.5859,0.4167],[0.638,0.4583],[0.6901,0.5],[0.724,0.5231],[0.7214,0.5463],[0.7161,0.5509],[0.6641,0.5],[0.5859,0.4537],[0.5339,0.4167]]],"lbl":[0.6263,0.462]},{"num":2,"forza":43,"partes":[[[0.4583,0.3056],[0.4766,0.294],[0.5078,0.3032],[0.5469,0.3287],[0.5859,0.3657],[0.625,0.3981],[0.6641,0.4213],[0.6758,0.4398],[0.6771,0.463],[0.6693,0.4676],[0.638,0.4491],[0.5859,0.4028],[0.5469,0.3657],[0.5339,0.3519],[0.5078,0.3194],[0.4818,0.3148],[0.4635,0.3125]]],"lbl":[0.5828,0.3787]},{"num":3,"forza":43,"partes":[[[0.3607,0.1667],[0.3789,0.1611],[0.3945,0.1898],[0.4141,0.2074],[0.4375,0.2199],[0.487,0.2315],[0.5078,0.2315],[0.5286,0.25],[0.5208,0.2731],[0.5026,0.2917],[0.4818,0.287],[0.4792,0.2824],[0.5026,0.2639],[0.5039,0.2523],[0.4766,0.2454],[0.4297,0.2338],[0.3906,0.2176],[0.3776,0.1991],[0.362,0.1759]]],"lbl":[0.4458,0.2259]},{"num":4,"forza":42,"partes":[[[0.4258,0.1981],[0.4609,0.2014],[0.5026,0.2278],[0.4818,0.2259],[0.4375,0.2106]]],"lbl":[0.4602,0.212]},{"num":5,"forza":42,"partes":[[[0.513,0.2963],[0.5234,0.287],[0.5859,0.2963],[0.638,0.3218],[0.6641,0.3333],[0.668,0.3889],[0.6628,0.4005],[0.638,0.3796],[0.5859,0.3472],[0.5339,0.3148]]],"lbl":[0.6073,0.337]},{"num":6,"forza":42,"partes":[[[0.5339,0.2431],[0.5859,0.2523],[0.6536,0.2708],[0.6693,0.2917],[0.6719,0.3079],[0.6667,0.3194],[0.612,0.2986],[0.5599,0.2824],[0.526,0.2778],[0.5312,0.2639]]],"lbl":[0.6029,0.2806]},{"num":7,"forza":44,"partes":[[[0.3971,0.162],[0.4609,0.1713],[0.5339,0.1921],[0.612,0.2153],[0.6615,0.2269],[0.6706,0.2454],[0.668,0.2639],[0.6484,0.2593],[0.5859,0.2407],[0.5078,0.2176],[0.4297,0.1944],[0.4036,0.1875]]],"lbl":[0.5432,0.2125]},{"num":8,"forza":44,"partes":[[[0.3841,0.1528],[0.3958,0.1319],[0.4271,0.131],[0.5339,0.1597],[0.612,0.1829],[0.6719,0.2014],[0.6758,0.2153],[0.668,0.2231],[0.612,0.2083],[0.5339,0.1852],[0.4609,0.162],[0.3906,0.1551]]],"lbl":[0.5299,0.1736]},{"num":9,"forza":43,"partes":[[[0.4232,0.1227],[0.4479,0.1102],[0.4818,0.1157],[0.5599,0.1481],[0.638,0.1713],[0.6745,0.1782],[0.6758,0.1944],[0.638,0.1875],[0.5599,0.1644],[0.4818,0.1435],[0.4297,0.125]]],"lbl":[0.5469,0.1514]},{"num":10,"forza":43,"partes":[[[0.4635,0.1019],[0.4818,0.0963],[0.5339,0.1111],[0.5859,0.1343],[0.638,0.1505],[0.6719,0.1551],[0.6745,0.169],[0.638,0.1644],[0.5599,0.1481],[0.5078,0.125],[0.4661,0.1065]]],"lbl":[0.5638,0.1352]},{"num":11,"forza":43,"partes":[[[0.4948,0.0926],[0.5208,0.0917],[0.5339,0.1019],[0.5859,0.125],[0.638,0.1366],[0.6745,0.1458],[0.6693,0.1505],[0.625,0.1412],[0.5599,0.125],[0.513,0.1019],[0.4961,0.0972]]],"lbl":[0.5828,0.125]},{"num":12,"forza":43,"partes":[[[0.526,0.0903],[0.5495,0.0824],[0.5859,0.1019],[0.612,0.1134],[0.638,0.1204],[0.6628,0.1296],[0.6615,0.1352],[0.612,0.1227],[0.5651,0.1088],[0.5339,0.0972]]],"lbl":[0.5846,0.1088]},{"num":13,"forza":43,"partes":[[[0.6302,0.1088],[0.6432,0.1102],[0.6536,0.1134],[0.6458,0.1204],[0.638,0.1157]]],"lbl":[0.6427,0.1144]},{"num":14,"forza":43,"partes":[[[0.5521,0.0741],[0.5651,0.0787],[0.5859,0.0926],[0.6198,0.1042],[0.6094,0.1065],[0.5807,0.0995],[0.5599,0.0856]]],"lbl":[0.5807,0.0935]},{"num":15,"forza":42,"partes":[[[0.362,0.1565],[0.3854,0.1343],[0.4297,0.0995],[0.4635,0.0764],[0.4766,0.0685],[0.5508,0.0657],[0.5516,0.0796],[0.5182,0.081],[0.4818,0.0889],[0.4635,0.0935],[0.4297,0.1134],[0.4036,0.1343],[0.3854,0.1505]]],"lbl":[0.4565,0.0995]},{"num":16,"forza":42,"partes":[[[0.6549,0.1134],[0.6732,0.1088],[0.7005,0.1296],[0.7044,0.1481],[0.7096,0.2407],[0.7161,0.3796],[0.7279,0.5],[0.7266,0.5069],[0.6901,0.4769],[0.6758,0.3565],[0.6784,0.25],[0.6797,0.1551]]],"lbl":[0.6948,0.3106]}]}],"forzas":[{"plano":"corona1","n":38,"fecha":null},{"plano":"corona1","n":39,"fecha":null},{"plano":"vasconia1","n":42,"fecha":null},{"plano":"vasconia1","n":43,"fecha":null},{"plano":"vasconia1","n":44,"fecha":null}]};
+function fzDatos(){
+  if(!APP.bloquesForza||!Array.isArray(APP.bloquesForza.planos)){
+    // primera vez: parte de la semilla; al primer cambio se guarda en Config
+    APP.bloquesForza=JSON.parse(JSON.stringify(FZ_SEMILLA));
+  }
+  return APP.bloquesForza;
+}
+function fzPlano(){
+  var d=fzDatos();
+  return d.planos.find(function(p){return p.id===FZ_PLANO;})||d.planos[0]||null;
+}
+function fzForzasDe(p){
+  var s={};
+  p.bloques.forEach(function(b){if(b.forza)s[b.forza]=1;});
+  fzDatos().forzas.forEach(function(f){if(f.plano===p.id)s[f.n]=1;});
+  return Object.keys(s).map(Number).sort(function(a,b){return a-b;});
+}
+function fzFecha(p,n){
+  var f=fzDatos().forzas.find(function(x){return x.plano===p.id&&x.n===n;});
+  return f&&f.fecha?f.fecha:'';
+}
+function fzSetFecha(p,n,v){
+  var d=fzDatos();
+  var f=d.forzas.find(function(x){return x.plano===p.id&&x.n===n;});
+  if(!f){f={plano:p.id,n:n,fecha:null};d.forzas.push(f);}
+  f.fecha=v||null;
+  fzGuardar();fzRender();
+}
+function fzCosecha(fechaISO){
+  if(!fechaISO)return null;
+  var d=new Date(fechaISO+'T12:00:00');if(isNaN(d))return null;
+  d.setMonth(d.getMonth()+(fzDatos().mesesACosecha||5));
+  return d;
+}
+function fzMesTxt(d){
+  if(!d)return '—';
+  return ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][d.getMonth()]+' '+d.getFullYear();
+}
+function fzColor(p,n){
+  var i=fzForzasDe(p).indexOf(n);
+  return FZ_PALETA[(i<0?0:i)%FZ_PALETA.length];
+}
+function fzGuardar(){
+  saveL();
+  try{guardarLotesEnSheet();}catch(e){}
+}
+function fzCargarFoto(p,cb){
+  if(FZ_IMG[p.id]!==undefined){cb();return;}
+  var im=new Image();
+  im.onload=function(){FZ_IMG[p.id]=im;cb();};
+  im.onerror=function(){FZ_IMG[p.id]=null;cb();};
+  im.src=p.foto+'?v='+APP_VERSION;
+}
+function initForza(){
+  var d=fzDatos();
+  if(!FZ_INITED){
+    FZ_INITED=true;
+    var sel=document.getElementById('fz-plano');
+    sel.addEventListener('change',function(){FZ_PLANO=sel.value;FZ_SEL=null;fzRender();});
+    document.getElementById('fz-btn-nueva').addEventListener('click',function(){
+      var p=fzPlano();if(!p)return;
+      var n=parseInt(document.getElementById('fz-nueva-n').value,10);
+      if(!n||n<1){toast('Escribí el número de la Forza',true);return;}
+      var ya=fzDatos().forzas.some(function(f){return f.plano===p.id&&f.n===n;});
+      if(!ya)fzDatos().forzas.push({plano:p.id,n:n,fecha:null});
+      document.getElementById('fz-nueva-n').value='';
+      fzGuardar();fzRender();
+    });
+    document.getElementById('fz-canvas').addEventListener('click',fzClickCanvas);
+    window.addEventListener('resize',function(){
+      if(document.getElementById('sp-forza').classList.contains('active'))fzDibujar();
+    });
+  }
+  if(!FZ_PLANO&&d.planos.length)FZ_PLANO=d.planos[0].id;
+  fzRender();
+}
+function fzRender(){
+  if(!FZ_INITED)return;
+  var d=fzDatos(),p=fzPlano();
+  var sel=document.getElementById('fz-plano');
+  sel.innerHTML=d.planos.map(function(x){return '<option value="'+x.id+'"'+(p&&x.id===p.id?' selected':'')+'>'+x.nombre+'</option>';}).join('');
+  if(!p)return;
+  fzCargarFoto(p,function(){
+    fzDibujar();
+    fzLeyenda(p);
+    fzTabla(p);
+  });
+}
+function fzPartesCentro(b){
+  if(b.lbl)return b.lbl;
+  var pts=b.partes[0],sx=0,sy=0;
+  pts.forEach(function(q){sx+=q[0];sy+=q[1];});
+  return [sx/pts.length,sy/pts.length];
+}
+function fzDibujar(){
+  var p=fzPlano();if(!p)return;
+  var cv=document.getElementById('fz-canvas'),wrap=document.getElementById('fz-canvas-wrap');
+  var w=Math.max(280,Math.min((wrap.clientWidth||900)-24,1200));
+  var h=Math.round(w/p.aspect);
+  var dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);
+  cv.style.width=w+'px';cv.style.height=h+'px';
+  var c=cv.getContext('2d');
+  c.setTransform(dpr,0,0,dpr,0,0);
+  var img=FZ_IMG[p.id];
+  document.getElementById('fz-sin-foto').style.display=img?'none':'block';
+  if(img){c.drawImage(img,0,0,w,h);}
+  else{
+    c.fillStyle='#1c1a14';c.fillRect(0,0,w,h);
+    c.strokeStyle='rgba(255,255,255,.05)';c.lineWidth=1;
+    for(var gx=0;gx<w;gx+=40){c.beginPath();c.moveTo(gx,0);c.lineTo(gx,h);c.stroke();}
+    for(var gy=0;gy<h;gy+=40){c.beginPath();c.moveTo(0,gy);c.lineTo(w,gy);c.stroke();}
+  }
+  p.bloques.forEach(function(b){
+    var col=fzColor(p,b.forza);
+    var sel=(FZ_SEL===b.num);
+    b.partes.forEach(function(pts){
+      c.beginPath();
+      pts.forEach(function(q,i){var x=q[0]*w,y=q[1]*h;if(i)c.lineTo(x,y);else c.moveTo(x,y);});
+      c.closePath();
+      c.fillStyle=col.f;c.fill();
+      c.lineWidth=sel?4:2;c.strokeStyle=sel?'#ffffff':col.s;c.stroke();
+    });
+    var m=fzPartesCentro(b),mx=m[0]*w,my=m[1]*h,r=Math.max(9,Math.min(13,w*0.012));
+    c.beginPath();c.arc(mx,my,r,0,Math.PI*2);
+    c.fillStyle='#ffffff';c.fill();c.lineWidth=2;c.strokeStyle=col.c;c.stroke();
+    c.fillStyle='#1c1a17';c.font='700 '+Math.round(r*1.05)+'px "Plus Jakarta Sans",sans-serif';
+    c.textAlign='center';c.textBaseline='middle';
+    c.fillText(String(b.num),mx,my+0.5);
+  });
+}
+function fzDentro(pt,pts){
+  var ins=false;
+  for(var i=0,j=pts.length-1;i<pts.length;j=i++){
+    var xi=pts[i][0],yi=pts[i][1],xj=pts[j][0],yj=pts[j][1];
+    if(((yi>pt[1])!==(yj>pt[1]))&&(pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi))ins=!ins;
+  }
+  return ins;
+}
+function fzClickCanvas(e){
+  var p=fzPlano();if(!p)return;
+  var cv=document.getElementById('fz-canvas'),r=cv.getBoundingClientRect();
+  var pt=[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height];
+  var hit=null;
+  for(var i=p.bloques.length-1;i>=0&&hit===null;i--){
+    var b=p.bloques[i];
+    if(b.partes.some(function(pts){return fzDentro(pt,pts);}))hit=b.num;
+  }
+  FZ_SEL=(hit===FZ_SEL)?null:hit;
+  fzDibujar();fzTabla(p);
+}
+function fzLeyenda(p){
+  var el=document.getElementById('fz-leyenda');
+  var h='';
+  fzForzasDe(p).forEach(function(n){
+    var col=fzColor(p,n);
+    var bs=p.bloques.filter(function(b){return b.forza===n;}).map(function(b){return b.num;}).sort(function(a,b){return a-b;});
+    var f=fzFecha(p,n),cos=fzCosecha(f);
+    h+='<div class="fz-chip"><span class="fz-sw" style="background:'+col.sw+';border-color:'+col.s+'"></span>'
+      +'<div class="fz-chip-body"><div class="fz-chip-t">Forza '+n+'</div>'
+      +'<div class="fz-chip-s">'+(bs.length?'Bloques '+bs.join(', '):'Sin bloques')+'</div>'
+      +'<div class="fz-chip-f"><label>Fecha</label><input type="date" class="fi" value="'+f+'" onchange="fzSetFecha(fzPlano(),'+n+',this.value)">'
+      +'<span class="fz-cos">Cosecha est. <b>'+fzMesTxt(cos)+'</b></span></div></div></div>';
+  });
+  el.innerHTML=h||'<div class="bq-hint">Este plano todavía no tiene Forza.</div>';
+}
+function fzTabla(p){
+  var tb=document.getElementById('fz-tbody');
+  var forzas=fzForzasDe(p);
+  tb.innerHTML=p.bloques.slice().sort(function(a,b){return a.num-b.num;}).map(function(b){
+    var col=fzColor(p,b.forza),cos=fzCosecha(fzFecha(p,b.forza));
+    var opts=forzas.map(function(n){return '<option value="'+n+'"'+(n===b.forza?' selected':'')+'>Forza '+n+'</option>';}).join('');
+    return '<tr'+(FZ_SEL===b.num?' class="bq-editing-row"':'')+' onclick="FZ_SEL='+b.num+';fzDibujar();fzTabla(fzPlano())">'
+      +'<td><span class="bq-swatch" style="background:'+col.sw+';border:1px solid '+col.c+'"></span>'+b.num+'</td>'
+      +'<td><select class="fi" style="padding:3px 6px;font-size:12px" onclick="event.stopPropagation()" onchange="fzCambiarForza(fzPlano(),'+b.num+',parseInt(this.value,10))">'+opts+'</select></td>'
+      +'<td>'+fzMesTxt(cos)+'</td></tr>';
+  }).join('');
+}
+function fzCambiarForza(p,num,n){
+  var b=p.bloques.find(function(x){return x.num===num;});
+  if(!b||!n)return;
+  b.forza=n;
+  fzGuardar();fzRender();
+}
+
 var BQ_INITED=false;
 function initBloques(){
   if(BQ_INITED)return; // los controles ya están cableados; el DOM del tab no se destruye al cambiar de pestaña
